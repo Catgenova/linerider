@@ -1,15 +1,48 @@
 # Neon Line Rider
 
-A from-scratch rebuild of the classic Flash toy as a pulsing neon sci-fi game. The physics is a
-faithful re-implementation of the original engine (40 fps Verlet points, one-sided lines, breakable
-mount bones), wrapped in a campaign with ink budgets, track materials, tricks, riders, interactive
-objects, bosses, ghosts, daily challenges, a track library, an arcade mode and hotseat co-op.
+A from-scratch rebuild of the classic Flash toy as a pulsing neon sci-fi game, available as a
+**Unity 2D project** (this repository root) and as a **browser build** (`web/`). Both share the same
+design: a faithful re-implementation of the original engine (40 fps Verlet points, one-sided lines,
+breakable mount bones) wrapped in a campaign with ink budgets, track materials, tricks, riders,
+interactive objects, bosses, ghosts, daily challenges, a track library, an arcade mode and hotseat
+co-op. The two builds are simulation-identical: the C# core reproduces the TypeScript traces to the
+last digit, share codes work across both, and the daily challenge is the same terrain on both.
 
-**Quickest way to play:** open `neon-line-rider.html` in any modern browser. It is a
-self-contained build of the whole game (no server, no install). It is a web game written in
-TypeScript on the HTML canvas, so there is nothing to open in Unity or another engine.
+## Unity (open this folder)
+
+1. In Unity Hub choose **Add project from disk** and pick this repository folder. It was written
+   for Unity 2022.3 LTS (`ProjectSettings/ProjectVersion.txt`); any 2022.3 or newer editor works.
+2. Open `Assets/Scenes/Main.unity` and press Play. The scene holds a camera and one `GameBootstrap`
+   component; everything else (renderer, UI, audio, input) is created in code at runtime.
+3. Build settings already list the scene, so **File > Build Settings > Build** produces a desktop
+   player. Save data and published tracks are written to `Application.persistentDataPath`.
+
+Layout:
 
 ```
+Assets/Scenes/Main.unity           bootstrap scene
+Assets/Scripts/Core/               engine-agnostic C# (no UnityEngine): physics, track, levels, run, editor,
+                                   tricks, daily/arcade directors, library, progress, JSON
+Assets/Scripts/Unity/              MonoBehaviours and views: controller, neon mesh renderer, uGUI HUD/menus,
+                                   procedural audio, input, bootstrap
+Assets/Resources/Shaders/          additive and alpha vertex-colour shaders used by the renderer
+tools/CoreTests/                   .NET console harness that replays the web build's reference traces
+tools/UnityCheck, tools/UnityStubs .NET compile check of the Unity layer against a stub UnityEngine
+tools/gen_levels.py                regenerates Levels.cs / BuiltinTracks.cs from the web level data
+tools/gen_unity_meta.py            regenerates the scene, build settings and .meta files
+```
+
+The core is verified without the editor: `cd tools/CoreTests && dotnet run` replays 12 physics
+scenarios and all 32 level runs recorded from the web build and checks positions match exactly,
+then runs behaviour checks (JSON round trips, share codes, daily seeds, editor budgets, objects).
+
+## Web (`web/`)
+
+**Quickest way to play:** open `web/neon-line-rider.html` in any modern browser. It is a
+self-contained build of the whole game (no server, no install).
+
+```
+cd web
 npm install
 npm run dev               # http://localhost:5173 with live reload
 npm test                  # physics + level sweep
@@ -86,14 +119,14 @@ Neon Peaks, Glacier Grid (global zero friction), Dune Circuit (gusting crosswind
 Bosh (classic sled), Vex (featherweight, more airtime, fragile), Tank (heavy, low friction, tough),
 Nova (snowboard model with a different point/bone rig). Riders unlock by completing specific levels.
 
-## Layout
+## Web layout
 
 ```
-src/physics    point, line (materials + collision), grid, rider models, props, world
-src/game       track model, editor constraints, levels, run controller, tricks, progress, library
-src/editor     camera and drawing tools
-src/render     neon renderer, parallax backgrounds, effects
-src/modes      arcade director, daily generator, built-in tracks
-src/ui         HUD, menu screens, input
-tests          physics behaviour and a sweep over every campaign level
+web/src/physics    point, line (materials + collision), grid, rider models, props, world
+web/src/game       track model, editor constraints, levels, run controller, tricks, progress, library
+web/src/editor     camera and drawing tools
+web/src/render     neon renderer, parallax backgrounds, effects
+web/src/modes      arcade director, daily generator, built-in tracks
+web/src/ui         HUD, menu screens, input
+web/tests          physics behaviour and a sweep over every campaign level
 ```

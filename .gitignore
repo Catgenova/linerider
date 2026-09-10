@@ -1,4 +1,37 @@
-node_modules/
-dist/
+# web build
+web/node_modules/
+web/dist/
 *.log
 .DS_Store
+
+# unity
+/Library/
+/Temp/
+/Obj/
+/Logs/
+/UserSettings/
+/Build/
+/Builds/
+*.csproj
+*.sln
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vs/
+.vscode/
+sysinfo.txt
+*.apk
+*.aab
+*.unitypackage
+*.app
+crashlytics-build.properties
+/Assets/AssetStoreTools*
+/Assets/Plugins/Editor/JetBrains*
+
+# .NET tooling for the core harness
+tools/**/bin/
+tools/**/obj/

@@ -1,0 +1,341 @@
+[
+ {
+  "id": "builtin-halfpipe",
+  "title": "Neon Halfpipe",
+  "author": "Studio",
+  "description": "A big bowl for practising flips and manuals. No budget, all materials unlocked.",
+  "tags": [
+   "stunt",
+   "showcase",
+   "freeride"
+  ],
+  "difficulty": 2,
+  "environment": "rooftops",
+  "budget": null,
+  "thumbnail": "",
+  "created": 1700000000000,
+  "likes": 12,
+  "plays": 0,
+  "liked": false,
+  "records": {
+   "bestFrames": null,
+   "bestInk": null,
+   "bestTrick": 0
+  },
+  "builtin": true,
+  "track": {
+   "version": 1,
+   "start": {
+    "x": 0,
+    "y": 0
+   },
+   "nextId": 9,
+   "lines": [
+    {
+     "id": 1,
+     "x1": -40,
+     "y1": 6,
+     "x2": 120,
+     "y2": 30,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 2,
+     "x1": 120,
+     "y1": 30,
+     "x2": 260,
+     "y2": 120,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 3,
+     "x1": 260,
+     "y1": 120,
+     "x2": 360,
+     "y2": 170,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 4,
+     "x1": 360,
+     "y1": 170,
+     "x2": 500,
+     "y2": 190,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 5,
+     "x1": 500,
+     "y1": 190,
+     "x2": 640,
+     "y2": 170,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 6,
+     "x1": 640,
+     "y1": 170,
+     "x2": 740,
+     "y2": 120,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 7,
+     "x1": 740,
+     "y1": 120,
+     "x2": 800,
+     "y2": 40,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 8,
+     "x1": 500,
+     "y1": 190,
+     "x2": 520,
+     "y2": 190,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    }
+   ]
+  }
+ },
+ {
+  "id": "builtin-sprint",
+  "title": "Booster Sprint",
+  "author": "Studio",
+  "description": "Straight-line speed with boosters. Race the clock to the finish.",
+  "tags": [
+   "speed",
+   "race"
+  ],
+  "difficulty": 1,
+  "environment": "mountain",
+  "budget": 60,
+  "thumbnail": "",
+  "created": 1700000001000,
+  "likes": 8,
+  "plays": 0,
+  "liked": false,
+  "records": {
+   "bestFrames": null,
+   "bestInk": null,
+   "bestTrick": 0
+  },
+  "builtin": true,
+  "track": {
+   "version": 1,
+   "start": {
+    "x": 0,
+    "y": 0
+   },
+   "finish": {
+    "x": 1100,
+    "y": 160,
+    "w": 50,
+    "h": 80
+   },
+   "nextId": 6,
+   "lines": [
+    {
+     "id": 1,
+     "x1": -40,
+     "y1": 6,
+     "x2": 200,
+     "y2": 40,
+     "material": "accel",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 2,
+     "x1": 200,
+     "y1": 40,
+     "x2": 480,
+     "y2": 120,
+     "material": "accel",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 3,
+     "x1": 480,
+     "y1": 120,
+     "x2": 700,
+     "y2": 160,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 4,
+     "x1": 900,
+     "y1": 220,
+     "x2": 1200,
+     "y2": 240,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 5,
+     "x1": 1200,
+     "y1": 240,
+     "x2": 1200,
+     "y2": 140,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    }
+   ]
+  }
+ },
+ {
+  "id": "builtin-drop",
+  "title": "The Long Drop",
+  "author": "Studio",
+  "description": "Fifteen metres of ink, a cliff, and one landing. Survive it.",
+  "tags": [
+   "puzzle",
+   "precision"
+  ],
+  "difficulty": 4,
+  "environment": "cave",
+  "budget": 15,
+  "thumbnail": "",
+  "created": 1700000002000,
+  "likes": 21,
+  "plays": 0,
+  "liked": false,
+  "records": {
+   "bestFrames": null,
+   "bestInk": null,
+   "bestTrick": 0
+  },
+  "builtin": true,
+  "track": {
+   "version": 1,
+   "start": {
+    "x": 0,
+    "y": 0
+   },
+   "finish": {
+    "x": 520,
+    "y": 350,
+    "w": 44,
+    "h": 70
+   },
+   "nextId": 4,
+   "lines": [
+    {
+     "id": 1,
+     "x1": -40,
+     "y1": 6,
+     "x2": 140,
+     "y2": 20,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 2,
+     "x1": 300,
+     "y1": 420,
+     "x2": 600,
+     "y2": 430,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    },
+    {
+     "id": 3,
+     "x1": 600,
+     "y1": 430,
+     "x2": 600,
+     "y2": 330,
+     "material": "normal",
+     "flipped": false,
+     "leftExt": false,
+     "rightExt": false,
+     "multiplier": 1,
+     "layer": "player",
+     "player": 0
+    }
+   ]
+  }
+ }
+]
