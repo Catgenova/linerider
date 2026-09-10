@@ -1,91 +1,37 @@
 # Cyber Rider
 
-A from-scratch rebuild of the classic Flash toy as a pulsing neon sci-fi game, available as a
-**Unity 2D project** (this repository root) and as a **browser build** (`web/`). Both share the same
-design: a faithful re-implementation of the original engine (40 fps Verlet points, one-sided lines,
-breakable mount bones) wrapped in a campaign with ink budgets, track materials, tricks, riders,
+A from-scratch rebuild of the classic Flash toy as a pulsing neon sci-fi browser game. Under the
+glow is a faithful re-implementation of the original engine (40 fps Verlet points, one-sided lines,
+breakable mount bones), wrapped in a campaign with ink budgets, track materials, tricks, riders,
 interactive objects, bosses, ghosts, daily challenges, a track library, an arcade mode and hotseat
-co-op. The two builds are simulation-identical: the C# core reproduces the TypeScript traces to the
-last digit, share codes work across both, and the daily challenge is the same terrain on both.
+co-op. It runs in any modern browser, on desktop and on phones.
 
-## Unity (open this folder)
+**Play it online:** <https://catgenova.github.io/linerider/>
 
-1. In Unity Hub choose **Add project from disk** and pick this repository folder. It is stamped
-   for Unity 6.4 (`6000.4.0f1` in `ProjectSettings/ProjectVersion.txt`); any Unity 6 editor opens
-   it as is, and 2022.3 LTS still works after its one-time version warning. Graphics APIs are
-   pinned (DirectX 11 then 12 on Windows, Vulkan then OpenGL ES 3 on Android) so the editor never
-   asks about them.
-2. Open `Assets/Scenes/Main.unity` and press Play. The scene holds a camera and one `GameBootstrap`
-   component; everything else (renderer, UI, audio, input) is created in code at runtime.
-   Input works with either backend: the project ships with **Active Input Handling = Both**, so the
-   classic Input Manager is read; in a project where only the Input System package is active
-   (`com.unity.inputsystem`, listed in `Packages/manifest.json`), the same scripts read its Mouse and
-   Keyboard devices and drive the UI through `InputSystemUIInputModule`.
-3. Build settings already list the scene, so **File > Build Settings > Build** produces a desktop
-   player. Save data and published tracks are written to `Application.persistentDataPath`.
+**Play it offline:** open `web/cyber-rider.html`. It is a self-contained build of the whole game,
+no server and no install.
 
-Layout:
+No backend is required. Progress, records, ghosts and published tracks live in `localStorage`;
+tracks travel between players as share codes (`CYR1.…`).
 
-```
-Assets/Scenes/Main.unity           bootstrap scene
-Assets/Scripts/Core/               engine-agnostic C# (no UnityEngine): physics, track, levels, run, editor,
-                                   tricks, daily/arcade/attract directors, library, progress, JSON
-Assets/Scripts/Unity/              MonoBehaviours and views: controller, neon mesh renderer, uGUI HUD/menus,
-                                   procedural audio, input, bootstrap
-Assets/Resources/Shaders/          additive and alpha vertex-colour shaders used by the renderer
-tools/CoreTests/                   .NET console harness that replays the web build's reference traces
-tools/UnityCheck, tools/UnityStubs .NET compile check of the Unity layer against a stub UnityEngine
-tools/gen_levels.py                regenerates Levels.cs / BuiltinTracks.cs from the web level data
-tools/gen_unity_meta.py            regenerates the scene, build settings and .meta files
-```
-
-The core is verified without the editor: `cd tools/CoreTests && dotnet run` replays 12 physics
-scenarios and all 32 level runs recorded from the web build and checks positions match exactly,
-then runs behaviour checks (JSON round trips, share codes, daily seeds, editor budgets, objects).
-
-### Android
-
-The project is set up for phones and tablets: landscape auto-rotation, ARM64 with IL2CPP, minimum
-API 24 (Android 7.0), package id `com.catgenova.cyberrider`, full-screen rendering with a HUD that
-keeps clear of the notch, and finger-sized controls (the UI scales with pixel density). To build:
-
-1. In Unity Hub add the **Android Build Support** module, with OpenJDK and the Android SDK & NDK
-   tools, to the editor you use for this project.
-2. Open the project, go to **File > Build Settings**, select **Android** and press
-   **Switch Platform**.
-3. Enable USB debugging on the phone, plug it in and press **Build And Run**, or press **Build** for
-   an APK to sideload. **Player Settings** already carry the settings above; change the package
-   name there before publishing.
-
-On a touchscreen one finger draws with the current tool (or pans with the Pan tool), two fingers
-pan and pinch-zoom, a second finger cancels the stroke in progress, and every keyboard shortcut has
-a button in the HUD. The browser build behaves the same way in Android Chrome: open
-`web/cyber-rider.html` on the phone, or add the dev server's address to the home screen.
-
-## Web (`web/`)
-
-**Play it online:** <https://catgenova.github.io/linerider/> (GitHub Pages, served from the
-`index.html` at the root of `main`; it also works on phones).
-
-**Quickest way to play offline:** open `web/cyber-rider.html` in any modern browser. It is a
-self-contained build of the whole game (no server, no install).
+## Development
 
 ```
 cd web
 npm install
 npm run dev               # http://localhost:5173 with live reload
-npm test                  # physics + level sweep
+npm test                  # physics behaviour tests + a sweep over every campaign level
 npm run build             # static bundle in dist/
 npm run build:standalone  # regenerate cyber-rider.html from dist/
 npm run pages             # the same, plus the root index.html that GitHub Pages publishes
 ```
 
-After changing the web build, run `npm run pages` and commit the root `index.html`; the Pages site
-updates a minute after the push to `main`. The `.nojekyll` file at the root keeps GitHub from
-running Jekyll over the Unity project.
+The site is GitHub Pages serving the `index.html` at the root of `main`. After changing the game,
+run `npm run pages` and commit the root `index.html`; the site updates a minute after the push.
+The root `.nojekyll` keeps GitHub from post-processing the file.
 
-No backend is required. Progress, records, ghosts and published tracks live in `localStorage`;
-tracks travel between players as share codes (`CYR1.…`).
+Stack: TypeScript, Vite, Canvas 2D (additive glow strokes), plain DOM for the HUD and menus,
+Vitest for tests. There are no runtime dependencies.
 
 ## Playing
 
@@ -107,6 +53,14 @@ tracks travel between players as share codes (`CYR1.…`).
 
 Lines are one-sided, exactly like the original: draw left to right and the top face is solid.
 
+### Phones and tablets
+
+Everything works by touch. One finger draws with the current tool (or pans with the Pan tool), two
+fingers pan and pinch-zoom, and a second finger landing mid-stroke cancels that stroke instead of
+leaving a mark. The HUD packs into the corners in landscape, keeps clear of notches, and every
+keyboard shortcut has a button. Open the site in the phone's browser, or add it to the home
+screen for a full-screen app.
+
 ## Modes
 
 - **Adventure** – eight regions, 32 levels, an overworld map. Each level ships partially built
@@ -127,6 +81,8 @@ Lines are one-sided, exactly like the original: draw left to right and the top f
 - **Co-op** – two players, one rider, two ink colours and budgets, Tab to hand over.
 - **Ghost racing** – your best finishing run on a level is stored as a track snapshot and replayed
   as a translucent rider in lockstep with your current attempt.
+- **Title demo** – the menu plays an endless generated ride behind itself, cycling through the
+  environments and riders.
 
 ## Materials
 
@@ -152,16 +108,21 @@ Neon Peaks, Glacier Grid (global zero friction), Dune Circuit (gusting crosswind
 ## Riders
 
 Bosh (the classic rig, drawn as a stick figure standing on a hoverboard), Vex (featherweight, more
-airtime, fragile), Tank (heavy, low friction, tough), Nova (a long deck with a tall standing rig). Riders unlock by completing specific levels.
+airtime, fragile), Tank (heavy, low friction, tough), Nova (a long deck with a tall standing rig).
+Riders unlock by completing specific levels.
 
-## Web layout
+## Layout
 
 ```
+index.html         the published game (generated by `npm run pages`, do not edit by hand)
 web/src/physics    point, line (materials + collision), grid, rider models, props, world
 web/src/game       track model, editor constraints, levels, run controller, tricks, progress, library
 web/src/editor     camera and drawing tools
 web/src/render     neon renderer, parallax backgrounds, effects
-web/src/modes      arcade director, daily generator, built-in tracks
-web/src/ui         HUD, menu screens, input
+web/src/modes      arcade director, daily generator, title demo, built-in tracks
+web/src/ui         HUD, menu screens, input (mouse, touch, keyboard)
 web/tests          physics behaviour and a sweep over every campaign level
 ```
+
+An earlier Unity 2D port of the same game is kept in git history at the `unity-port` tag. It is
+not maintained; the browser build is the game.
