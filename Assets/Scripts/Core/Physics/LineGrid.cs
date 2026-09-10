@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>Spatial hash of static lines. Queries return lines near a point in ascending id order.</summary>
     public sealed class LineGrid

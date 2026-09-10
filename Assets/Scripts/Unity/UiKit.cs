@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     /// <summary>Small helpers for building uGUI in code with the neon look.</summary>
     public static class UiKit

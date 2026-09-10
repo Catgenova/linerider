@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     public sealed class GhostRecord
     {
@@ -34,7 +34,7 @@ namespace NeonLineRider.Core
     /// <summary>Campaign progress, records, ghosts and settings, persisted as JSON through IStorage.</summary>
     public sealed class Progress
     {
-        private const string Key = "neon-linerider-save-v1";
+        private const string Key = "cyber-rider-save-v1";
         public readonly Dictionary<string, LevelRecord> Levels = new Dictionary<string, LevelRecord>();
         public int ArcadeBest;
         public readonly Dictionary<string, DailyRecord> Daily = new Dictionary<string, DailyRecord>();

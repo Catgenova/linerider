@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using NeonLineRider.Core;
+using CyberRider.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     /// <summary>In-game overlay: ink meter, timer, objectives, tools, materials, playback.</summary>
     public sealed class Hud
@@ -197,7 +197,7 @@ namespace NeonLineRider.Unity
 
             LevelDef level = game.Level;
             string modeLabel = game.Mode == GameMode.Free ? "FREE RIDE" : game.Mode == GameMode.Arcade ? "RUSH" : game.Mode == GameMode.Daily ? "DAILY" : game.Mode == GameMode.Coop ? "CO-OP" : game.Mode == GameMode.Library ? "COMMUNITY" : level != null ? level.Mode.ToUpperInvariant() : "";
-            _title.text = level != null ? level.Name : game.LibraryTrack != null ? game.LibraryTrack.Title : game.Mode == GameMode.Arcade ? "Neon Rush" : "Free Ride";
+            _title.text = level != null ? level.Name : game.LibraryTrack != null ? game.LibraryTrack.Title : game.Mode == GameMode.Arcade ? "Cyber Rush" : "Free Ride";
             _mode.text = modeLabel + " - " + game.Environment.Name + " - " + game.RiderDef.Name;
             _inkBox2.gameObject.SetActive(game.CoopActive);
             _hint.text = game.Mode == GameMode.Arcade

@@ -1,8 +1,8 @@
 using System;
-using NeonLineRider.Core;
+using CyberRider.Core;
 using UnityEngine;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     /// <summary>Paints a small preview of a track into a texture for the library cards.</summary>
     public static class ThumbnailPainter

@@ -20,7 +20,7 @@ export interface SaveData {
   settings: { rider: string; showTicks: boolean; music: boolean };
 }
 
-const KEY = 'neon-linerider-save-v1';
+const KEY = 'cyber-rider-save-v1';
 
 function blank(): SaveData {
   return { version: 1, levels: {}, arcadeBest: 0, daily: {}, settings: { rider: 'bosh', showTicks: true, music: true } };

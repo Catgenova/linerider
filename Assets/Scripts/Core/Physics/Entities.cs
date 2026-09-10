@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>
     /// Flat definition of any entity (mirrors the JSON shape used by levels and published tracks).

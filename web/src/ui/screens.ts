@@ -55,12 +55,12 @@ export class Screens {
     this.mount(
       'title',
       el('div', { class: 'title-screen' }, [
-        el('div', { class: 'logo' }, [el('span', { class: 'l1', text: 'NEON' }), el('span', { class: 'l2', text: 'LINE RIDER' })]),
+        el('div', { class: 'logo' }, [el('span', { class: 'l1', text: 'CYBER' }), el('span', { class: 'l2', text: 'RIDER' })]),
         el('div', { class: 'tagline', text: 'Draw the line. Ride the pulse.' }),
         el('div', { class: 'menu' }, [
           this.bigButton('ADVENTURE', `${done}/${LEVELS.length} levels · ${medals.gold} gold`, () => this.map()),
           this.bigButton('FREE RIDE', 'Unlimited ink, every material, publish your tracks', () => this.freeRideEnv()),
-          this.bigButton('NEON RUSH', `Draw while riding · best ${g.progress.data.arcadeBest} m`, () => {
+          this.bigButton('CYBER RUSH', `Draw while riding · best ${g.progress.data.arcadeBest} m`, () => {
             g.startArcade();
             this.hide();
             this.onEnterGame();
@@ -412,7 +412,7 @@ export class Screens {
   library(filter: 'all' | 'mine' | 'builtin' = 'all'): void {
     const g = this.game;
     const items = g.store.list().filter((t) => (filter === 'all' ? true : filter === 'mine' ? !t.builtin : t.builtin));
-    const importBox = el('textarea', { class: 'code', placeholder: 'Paste a share code (NLR1.…) to import a track' }) as HTMLTextAreaElement;
+    const importBox = el('textarea', { class: 'code', placeholder: 'Paste a share code (CYR1.…) to import a track' }) as HTMLTextAreaElement;
     const cards = el('div', { class: 'track-grid' }, items.map((t) => this.trackCard(t, () => this.library(filter))));
     this.mount(
       'library',
@@ -432,7 +432,7 @@ export class Screens {
             onClick: () => {
               const decoded = decodeShareCode(importBox.value);
               if (!decoded) {
-                alert('That code did not decode. Codes start with NLR1.');
+                alert('That code did not decode. Codes start with CYR1.');
                 return;
               }
               const env = ENVIRONMENTS[decoded.environment] ?? ENVIRONMENTS.mountain;

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>Key/value persistence supplied by the host (PlayerPrefs, files, memory).</summary>
     public interface IStorage
@@ -118,7 +118,7 @@ namespace NeonLineRider.Core
     /// </summary>
     public sealed class LocalTrackStore
     {
-        private const string Key = "neon-linerider-library-v1";
+        private const string Key = "cyber-rider-library-v1";
         private readonly IStorage _storage;
         private readonly List<PublishedTrack> _builtins;
         private List<PublishedTrack> _items;
@@ -209,7 +209,7 @@ namespace NeonLineRider.Core
 
     public static class ShareCodes
     {
-        /// <summary>Encode a published track as a shareable string (NLR1. + base64 JSON), compatible with the web build.</summary>
+        /// <summary>Encode a published track as a shareable string (CYR1. + base64 JSON), compatible with the web build.</summary>
         public static string Encode(PublishedTrack track)
         {
             var tags = new List<object>();
@@ -226,7 +226,7 @@ namespace NeonLineRider.Core
                 ["k"] = track.TrackJson,
             };
             string json = Json.Stringify(payload);
-            return "NLR1." + Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
+            return "CYR1." + Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
         }
 
         public static PublishedTrack Decode(string code)
@@ -234,7 +234,8 @@ namespace NeonLineRider.Core
             try
             {
                 string trimmed = code.Trim();
-                if (!trimmed.StartsWith("NLR1.")) return null;
+                // CYR1 is the current prefix; NLR1 codes from the earlier name still decode.
+                if (!trimmed.StartsWith("CYR1.") && !trimmed.StartsWith("NLR1.")) return null;
                 string json = Encoding.UTF8.GetString(Convert.FromBase64String(trimmed.Substring(5)));
                 var payload = Json.Obj(Json.Parse(json));
                 var track = Json.Obj(Json.Get(payload, "k"));

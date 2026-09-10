@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using NeonLineRider.Core;
+using CyberRider.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     /// <summary>Full-screen menus layered over the world: title, map, intro, results, library, riders, co-op, daily, pause.</summary>
     public sealed class Screens
@@ -102,15 +102,15 @@ namespace NeonLineRider.Unity
             g.Progress.TotalMedals(out _, out _, out int gold);
             int done = 0;
             foreach (LevelDef l in Levels.All) if (g.Progress.IsComplete(l.Id)) done++;
-            var logo = UiKit.Label(c, "NEON", 72, Color.white, TextAnchor.MiddleCenter, true);
+            var logo = UiKit.Label(c, "CYBER", 72, Color.white, TextAnchor.MiddleCenter, true);
             UiKit.Size(logo, -1, 80);
-            var logo2 = UiKit.Label(c, "LINE RIDER", 34, UiKit.Magenta, TextAnchor.MiddleCenter, true);
+            var logo2 = UiKit.Label(c, "RIDER", 34, UiKit.Magenta, TextAnchor.MiddleCenter, true);
             UiKit.Size(logo2, -1, 44);
             UiKit.Label(c, "Draw the line. Ride the pulse.", 13, UiKit.Muted, TextAnchor.MiddleCenter);
             UiKit.Spacer(c, 10);
             BigButton(c, "ADVENTURE", done + "/" + Levels.All.Count + " levels · " + gold + " gold", () => Map(_selectedRegion));
             BigButton(c, "FREE RIDE", "Unlimited ink, every material, place objects, publish your tracks", FreeRideEnv);
-            BigButton(c, "NEON RUSH", "Draw while riding · best " + g.Progress.ArcadeBest + " m", () => { g.StartArcade(); Hide(); _onEnterGame(); });
+            BigButton(c, "CYBER RUSH", "Draw while riding · best " + g.Progress.ArcadeBest + " m", () => { g.StartArcade(); Hide(); _onEnterGame(); });
             BigButton(c, "DAILY CHALLENGE", Daily.TodayKey(), DailyScreen);
             BigButton(c, "TRACK LIBRARY", "Community tracks, share codes, records", () => Library("all"));
             BigButton(c, "CO-OP", "Two players, two colours of ink", Coop);
@@ -445,7 +445,7 @@ namespace NeonLineRider.Unity
             foreach (PublishedTrack t in items) TrackCard(grid.transform, t, () => Library(filter));
             Para(c, "Import", 14, UiKit.Muted);
             var importRow = Row(c);
-            InputField field = UiKit.Input(importRow.transform, "Paste a share code (NLR1.) to import a track");
+            InputField field = UiKit.Input(importRow.transform, "Paste a share code (CYR1.) to import a track");
             UiKit.Size(field, 760, 30, 400);
             UiKit.Button(importRow.transform, "IMPORT", () =>
             {

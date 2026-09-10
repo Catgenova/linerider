@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>A prebuilt line in a level definition.</summary>
     public sealed class LevelLine

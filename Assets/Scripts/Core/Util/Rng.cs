@@ -1,6 +1,6 @@
 using System;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>Deterministic PRNG (mulberry32), bit-compatible with the web build so daily seeds match.</summary>
     public sealed class Rng

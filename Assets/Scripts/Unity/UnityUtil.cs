@@ -1,10 +1,10 @@
 using System;
 using System.Globalization;
 using System.IO;
-using NeonLineRider.Core;
+using CyberRider.Core;
 using UnityEngine;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     /// <summary>Coordinate and colour helpers. The simulation uses px with y down; Unity uses units with y up.</summary>
     public static class U
@@ -70,7 +70,7 @@ namespace NeonLineRider.Unity
 
         public FileStorage()
         {
-            _dir = Path.Combine(Application.persistentDataPath, "neon-line-rider");
+            _dir = Path.Combine(Application.persistentDataPath, "cyber-rider");
             try
             {
                 Directory.CreateDirectory(_dir);

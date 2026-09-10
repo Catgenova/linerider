@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     public sealed class Particle
     {

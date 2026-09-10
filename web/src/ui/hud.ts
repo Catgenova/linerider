@@ -140,7 +140,7 @@ export class Hud {
     clear(this.title);
     const modeLabel = game.mode === 'free' ? 'FREE RIDE' : game.mode === 'arcade' ? 'RUSH' : game.mode === 'daily' ? 'DAILY' : game.mode === 'coop' ? 'CO-OP' : game.mode === 'library' ? 'COMMUNITY' : level?.mode.toUpperCase() ?? '';
     this.title.append(
-      el('div', { class: 'name', text: level ? level.name : game.libraryTrack ? game.libraryTrack.title : game.mode === 'arcade' ? 'Neon Rush' : 'Free Ride' }),
+      el('div', { class: 'name', text: level ? level.name : game.libraryTrack ? game.libraryTrack.title : game.mode === 'arcade' ? 'Cyber Rush' : 'Free Ride' }),
       el('div', { class: 'mode', text: `${modeLabel} · ${game.environment.name} · ${game.riderDef.name}` }),
     );
     this.inkBox2.style.display = game.coop.active ? '' : 'none';

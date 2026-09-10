@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using NeonLineRider.Core;
+using CyberRider.Core;
 using UnityEngine;
-using CoreMaterial = NeonLineRider.Core.Material;
-using Env = NeonLineRider.Core.Environment;
+using CoreMaterial = CyberRider.Core.Material;
+using Env = CyberRider.Core.Environment;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     /// <summary>Draws the world with additive glow meshes, a parallax backdrop, effects and the cave halo.</summary>
     public sealed class WorldRenderer

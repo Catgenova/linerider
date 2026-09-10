@@ -1,7 +1,9 @@
 {
-    "name": "NeonLineRider.Core",
-    "rootNamespace": "NeonLineRider.Core",
-    "references": [],
+    "name": "CyberRider.Unity",
+    "rootNamespace": "CyberRider.Unity",
+    "references": [
+        "CyberRider.Core"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
@@ -10,5 +12,5 @@
     "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [],
-    "noEngineReferences": true
+    "noEngineReferences": false
 }

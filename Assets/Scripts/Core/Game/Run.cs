@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     public sealed class RunEvent
     {

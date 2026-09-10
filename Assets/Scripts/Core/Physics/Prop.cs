@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>Definition of a physics prop (also the JSON shape stored in tracks and levels).</summary>
     public sealed class PropDef

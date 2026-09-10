@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using NeonLineRider.Core;
+using CyberRider.Core;
 
 /// <summary>
 /// Console harness for the engine-agnostic core. Replays the reference traces dumped from the
@@ -202,13 +202,13 @@ internal static class Program
         var pub = new PublishedTrack { Title = "Round trip", Author = "Harness", Description = "d", Difficulty = 3, Environment = "moon", Budget = 55, TrackJson = track.ToJson() };
         pub.Tags.Add("test");
         string code = ShareCodes.Encode(pub);
-        Check(code.StartsWith("NLR1."), "share code prefix");
+        Check(code.StartsWith("CYR1."), "share code prefix");
         PublishedTrack decoded = ShareCodes.Decode(code);
         Check(decoded != null && decoded.Title == "Round trip" && decoded.Budget == 55 && decoded.Tags.Count == 1 && decoded.LoadTrack().Lines.Count == 2, "share code decode");
         Check(ShareCodes.Decode("garbage") == null, "share code rejects garbage");
 
         // Web-built share code decodes here too.
-        string webCode = "NLR1." + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("{\"t\":\"Web\",\"a\":\"Tester\",\"d\":\"\",\"g\":[\"speed\"],\"f\":2,\"e\":\"moon\",\"b\":null,\"k\":{\"version\":1,\"start\":{\"x\":0,\"y\":0},\"lines\":[{\"id\":1,\"x1\":-40,\"y1\":6,\"x2\":200,\"y2\":60,\"material\":\"normal\",\"flipped\":false,\"leftExt\":false,\"rightExt\":false,\"multiplier\":1,\"layer\":\"player\",\"player\":0}],\"nextId\":2}}"));
+        string webCode = "CYR1." + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("{\"t\":\"Web\",\"a\":\"Tester\",\"d\":\"\",\"g\":[\"speed\"],\"f\":2,\"e\":\"moon\",\"b\":null,\"k\":{\"version\":1,\"start\":{\"x\":0,\"y\":0},\"lines\":[{\"id\":1,\"x1\":-40,\"y1\":6,\"x2\":200,\"y2\":60,\"material\":\"normal\",\"flipped\":false,\"leftExt\":false,\"rightExt\":false,\"multiplier\":1,\"layer\":\"player\",\"player\":0}],\"nextId\":2}}"));
         PublishedTrack web = ShareCodes.Decode(webCode);
         Check(web != null && web.Title == "Web" && !web.Budget.HasValue && web.LoadTrack().Lines.Count == 1, "decodes a web share code");
 

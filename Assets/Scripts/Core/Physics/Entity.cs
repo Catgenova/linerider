@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>
     /// Anything that lives in the world besides static lines and riders: moving platforms, gears,

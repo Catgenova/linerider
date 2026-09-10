@@ -20,6 +20,6 @@ html = html
   .replace(/<link rel="stylesheet"[^>]*href="\.\/assets\/[^"]*"[^>]*>/, () => `<style>\n${style}\n</style>`);
 
 if (html.includes('./assets/')) throw new Error('An asset reference was not inlined.');
-const out = join(process.cwd(), 'neon-line-rider.html');
+const out = join(process.cwd(), 'cyber-rider.html');
 writeFileSync(out, html);
 console.log(`wrote ${out} (${(html.length / 1024).toFixed(0)} KB)`);

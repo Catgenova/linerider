@@ -1,6 +1,6 @@
 using System;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>A Verlet point mass. Velocity is implicit in (pos - prev); Vx/Vy caches the frame momentum.</summary>
     public sealed class Point

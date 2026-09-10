@@ -1,6 +1,6 @@
 using System;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>Double precision 2D vector used by the simulation (screen convention: y points down).</summary>
     public struct Vec2d

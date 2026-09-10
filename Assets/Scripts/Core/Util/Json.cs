@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>
     /// Tiny JSON reader/writer over plain objects: Dictionary&lt;string, object&gt;, List&lt;object&gt;,

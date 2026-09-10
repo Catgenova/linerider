@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>Seeded daily challenge generator. Same date gives the same terrain as the web build.</summary>
     public static class Daily

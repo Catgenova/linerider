@@ -1,4 +1,4 @@
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>Simulation constants of the classic engine.</summary>
     public static class Constants

@@ -21,7 +21,7 @@ export interface PublishedTrack {
   builtin?: boolean;
 }
 
-const KEY = 'neon-linerider-library-v1';
+const KEY = 'cyber-rider-library-v1';
 
 /**
  * Track sharing store. This implementation keeps everything in localStorage and exchanges tracks
@@ -97,7 +97,7 @@ export class LocalTrackStore implements TrackStore {
   }
 }
 
-/** Encode a published track as a shareable string (base64 JSON). */
+/** Encode a published track as a shareable string (CYR1. + base64 JSON). */
 export function encodeShareCode(track: PublishedTrack): string {
   const payload = {
     t: track.title,
@@ -113,13 +113,14 @@ export function encodeShareCode(track: PublishedTrack): string {
   const bytes = new TextEncoder().encode(json);
   let bin = '';
   for (const b of bytes) bin += String.fromCharCode(b);
-  return 'NLR1.' + btoa(bin);
+  return 'CYR1.' + btoa(bin);
 }
 
 export function decodeShareCode(code: string): Omit<PublishedTrack, 'id' | 'created' | 'likes' | 'plays' | 'liked' | 'records' | 'thumbnail'> | null {
   try {
     const trimmed = code.trim();
-    if (!trimmed.startsWith('NLR1.')) return null;
+    // CYR1 is the current prefix; NLR1 codes from the earlier name still decode.
+    if (!trimmed.startsWith('CYR1.') && !trimmed.startsWith('NLR1.')) return null;
     const bin = atob(trimmed.slice(5));
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);

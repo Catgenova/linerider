@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     /// <summary>
     /// Builds the whole game at runtime: camera, world renderer, UI canvas, audio and input. The
@@ -23,7 +23,7 @@ namespace NeonLineRider.Unity
         {
             if (_installed) return;
             if (FindObjectOfType<GameBootstrap>() != null) return;
-            var go = new GameObject("Neon Line Rider");
+            var go = new GameObject("Cyber Rider");
             go.AddComponent<GameBootstrap>();
         }
 

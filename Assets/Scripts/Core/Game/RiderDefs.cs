@@ -1,4 +1,4 @@
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     public sealed class RiderDef
     {

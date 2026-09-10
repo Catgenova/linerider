@@ -1,9 +1,9 @@
 {
-  "name": "neon-linerider",
+  "name": "cyber-rider",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A neon cyberpunk rebuild of Line Rider with campaign, puzzle, and arcade modes.",
+  "description": "Cyber Rider: a neon cyberpunk rebuild of Line Rider with campaign, puzzle, and arcade modes.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

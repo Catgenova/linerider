@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using NeonLineRider.Core;
-using Env = NeonLineRider.Core.Environment;
-using TrackEditor = NeonLineRider.Core.Editor;
+using CyberRider.Core;
+using Env = CyberRider.Core.Environment;
+using TrackEditor = CyberRider.Core.Editor;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     public enum GameMode
     {

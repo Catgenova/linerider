@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     public enum MaterialId
     {

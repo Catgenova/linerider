@@ -1,8 +1,8 @@
-using NeonLineRider.Core;
+using CyberRider.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     /// <summary>Mouse and keyboard handling for the editor, camera and playback shortcuts.</summary>
     public sealed class InputController

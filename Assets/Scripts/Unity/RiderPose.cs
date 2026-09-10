@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using NeonLineRider.Core;
+using CyberRider.Core;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     public struct Seg
     {

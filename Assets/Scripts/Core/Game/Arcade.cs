@@ -1,4 +1,4 @@
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     /// <summary>
     /// Draw-while-riding: the rider is always moving, terrain is generated ahead as ledges with gaps

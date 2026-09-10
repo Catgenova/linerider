@@ -1,6 +1,6 @@
 using System;
 
-namespace NeonLineRider.Core
+namespace CyberRider.Core
 {
     public struct PointDef
     {

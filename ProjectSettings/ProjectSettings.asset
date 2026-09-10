@@ -1,0 +1,13 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 26
+  productGUID: 7c4b2c3f9d1e4a5b8c6d7e8f9a0b1c2d
+  companyName: Catgenova
+  productName: Cyber Rider
+  defaultScreenWidth: 1280
+  defaultScreenHeight: 760
+  runInBackground: 1
+  fullscreenMode: 3

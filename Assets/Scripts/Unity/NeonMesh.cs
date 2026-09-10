@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     /// <summary>
     /// Accumulates coloured quads/triangles for one material and pushes them into a Mesh each frame.

@@ -1,4 +1,4 @@
-# Neon Line Rider
+# Cyber Rider
 
 A from-scratch rebuild of the classic Flash toy as a pulsing neon sci-fi game, available as a
 **Unity 2D project** (this repository root) and as a **browser build** (`web/`). Both share the same
@@ -38,7 +38,7 @@ then runs behaviour checks (JSON round trips, share codes, daily seeds, editor b
 
 ## Web (`web/`)
 
-**Quickest way to play:** open `web/neon-line-rider.html` in any modern browser. It is a
+**Quickest way to play:** open `web/cyber-rider.html` in any modern browser. It is a
 self-contained build of the whole game (no server, no install).
 
 ```
@@ -47,11 +47,11 @@ npm install
 npm run dev               # http://localhost:5173 with live reload
 npm test                  # physics + level sweep
 npm run build             # static bundle in dist/
-npm run build:standalone  # regenerate neon-line-rider.html from dist/
+npm run build:standalone  # regenerate cyber-rider.html from dist/
 ```
 
 No backend is required. Progress, records, ghosts and published tracks live in `localStorage`;
-tracks travel between players as share codes (`NLR1.…`).
+tracks travel between players as share codes (`CYR1.…`).
 
 ## Playing
 
@@ -82,7 +82,7 @@ Lines are one-sided, exactly like the original: draw left to right and the top f
   clock tower, rolling moonball, the machine core).
 - **Free Ride** – unlimited ink in any environment, place your own start and finish, drop in
   physics toys and props from the object palette (O), and publish the result.
-- **Neon Rush** – draw-while-riding arcade: the rider never stops, terrain generates ahead, ink
+- **Cyber Rush** – draw-while-riding arcade: the rider never stops, terrain generates ahead, ink
   regenerates with distance, a tailwind keeps raising the pace. Score is distance.
 - **Daily Challenge** – seeded from the UTC date; everyone gets the same terrain, flags, finish and
   budget. Separate boards for fastest time, least ink and trick score.

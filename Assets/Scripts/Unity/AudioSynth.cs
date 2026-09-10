@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace NeonLineRider.Unity
+namespace CyberRider.Unity
 {
     /// <summary>
     /// Procedural soundtrack and effects: a pulsing bass beat while riding, a soft pad while editing,
