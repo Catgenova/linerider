@@ -1,17 +1,29 @@
 import type { Game, ResultsInfo } from '../game/game';
 import { ENVIRONMENTS, ENVIRONMENT_ORDER, type EnvironmentId } from '../game/environments';
-import { objectiveLabel, type LevelDef, type Medal } from '../game/level';
+import { objectiveLabel, type LevelDef } from '../game/level';
 import { LEVELS, REGIONS } from '../game/levels';
 import { decodeShareCode, encodeShareCode, type PublishedTrack } from '../game/library';
 import { RIDERS, RIDER_ORDER, type RiderId } from '../game/riders';
-import { MATERIALS } from '../physics/materials';
+import { MATERIALS, type MaterialId } from '../physics/materials';
+import { OBJECT_KINDS } from '../game/objectKinds';
 import { Renderer } from '../render/renderer';
 import { $, clear, el, fmtInk, fmtTime } from './dom';
 import { todayKey } from '../modes/daily';
 
-export type ScreenName = 'title' | 'map' | 'intro' | 'results' | 'library' | 'riders' | 'coop' | 'pause' | 'daily' | 'none';
+export type ScreenName = 'title' | 'map' | 'intro' | 'results' | 'library' | 'riders' | 'coop' | 'pause' | 'daily' | 'none' | 'stats';
 
-const MEDAL_ICON: Record<Medal, string> = { none: '', bronze: '●', silver: '●', gold: '●' };
+function fmtDistance(m: number): string {
+  return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
+}
+
+function fmtDuration(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h) return `${h}h ${m}m`;
+  if (m) return `${m}m ${s % 60}s`;
+  return `${s}s`;
+}
 
 /** Full-screen menus layered over the canvas. */
 export class Screens {
@@ -54,14 +66,15 @@ export class Screens {
     const g = this.game;
     if (g.mode !== 'attract') g.startAttract();
     const medals = g.progress.totalMedals();
-    const done = LEVELS.filter((l) => g.progress.isComplete(l.id)).length;
+    const obj = g.progress.objectiveTotals(LEVELS);
+    const st = g.progress.stats;
     this.mount(
       'title',
       el('div', { class: 'title-screen' }, [
         el('div', { class: 'logo' }, [el('span', { class: 'l1', text: 'CYBER' }), el('span', { class: 'l2', text: 'RIDER' })]),
         el('div', { class: 'tagline', text: 'Draw the line. Ride the pulse.' }),
         el('div', { class: 'menu' }, [
-          this.bigButton('ADVENTURE', `${done}/${LEVELS.length} levels · ${medals.gold} gold`, () => this.map()),
+          this.bigButton('ADVENTURE', `${obj.done}/${obj.total} objectives · ${medals.gold} gold`, () => this.map()),
           this.bigButton('FREE RIDE', 'Unlimited ink, every material, publish your tracks', () => this.freeRideEnv()),
           this.bigButton('CYBER RUSH', `Draw while riding · best ${g.progress.data.arcadeBest} m`, () => {
             g.startArcade();
@@ -72,6 +85,7 @@ export class Screens {
           this.bigButton('TRACK LIBRARY', 'Community tracks, share codes, records', () => this.library()),
           this.bigButton('CO-OP', 'Two players, two colours of ink', () => this.coop()),
           this.bigButton('RIDERS', `Riding as ${g.riderDef.name}`, () => this.riders()),
+          this.bigButton('LIFETIME STATS', `${st.runs} runs · ${fmtDistance(st.distance)} ridden`, () => this.stats()),
         ]),
         el('div', { class: 'foot' }, [
           el('button', {
@@ -132,13 +146,13 @@ export class Screens {
       const unlocked = g.regionUnlocked(i);
       if (unlocked) furthest = i;
       const levels = g.levelsInRegion(r.id);
-      const done = levels.filter((l) => g.progress.isComplete(l.id)).length;
+      const obj = g.progress.objectiveTotals(levels);
       const node = el('button', {
         class: `map-node${unlocked ? '' : ' locked'}${i === regionIndex ? ' selected' : ''}`,
         style: `left:${r.mapX * 100}%;top:${r.mapY * 100}%;--a:${ENVIRONMENTS[r.environment].visuals.accent}`,
         onClick: () => unlocked && this.map(i),
         title: r.blurb,
-      }, [el('span', { class: 'dot' }), el('span', { class: 'nm', text: r.name }), el('span', { class: 'ct', text: unlocked ? `${done}/${levels.length}` : '🔒' })]);
+      }, [el('span', { class: 'dot' }), el('span', { class: 'nm', text: r.name }), el('span', { class: 'ct', text: unlocked ? `◆ ${obj.done}/${obj.total}` : '🔒' })]);
       mapArea.append(node);
     });
     const marker = REGIONS[furthest];
@@ -146,6 +160,9 @@ export class Screens {
 
     const levels = g.levelsInRegion(region.id);
     const list = el('div', { class: 'level-list' }, levels.map((lv) => this.levelCard(lv)));
+    const all = g.progress.objectiveTotals(LEVELS);
+    const regionObj = g.progress.objectiveTotals(levels);
+    const medals = g.progress.totalMedals();
     this.mount(
       'map',
       this.panel('wide', [
@@ -153,9 +170,11 @@ export class Screens {
           el('h2', { text: 'ADVENTURE MAP' }),
           el('button', { class: 'btn', text: '← menu', onClick: () => this.title() }),
         ]),
+        el('p', { class: 'stats-intro', text: `${all.done}/${all.total} objectives earned · ${medals.bronze} bronze · ${medals.silver} silver · ${medals.gold} gold` }),
         mapArea,
         el('div', { class: 'region-head' }, [
           el('h3', { text: region.name, style: `color:${ENVIRONMENTS[region.environment].visuals.accent}` }),
+          el('span', { class: 'pill', text: `${regionObj.done}/${regionObj.total} objectives` }),
           el('span', { class: 'muted', text: `${region.blurb} · ${ENVIRONMENTS[region.environment].gimmick}` }),
         ]),
         list,
@@ -167,15 +186,17 @@ export class Screens {
     const g = this.game;
     const rec = g.progress.level(lv.id);
     const unlocked = g.levelUnlocked(lv);
+    const earned = g.progress.earned(lv);
+    const done = earned.filter(Boolean).length;
     return el('button', {
       class: `level-card${unlocked ? '' : ' locked'} medal-${rec.medal}`,
       onClick: () => unlocked && this.intro(lv),
     }, [
-      el('span', { class: 'medal', text: MEDAL_ICON[rec.medal] }),
+      el('span', { class: 'pips', title: `${done}/${lv.objectives.length} objectives earned` }, lv.objectives.map((o, i) => el('i', { class: `pip${earned[i] ? ' on' : ''}${o.optional ? ' opt' : ''}` }))),
       el('span', { class: 'n', text: lv.name }),
       el('span', { class: 'm', text: `${lv.mode.toUpperCase()} · ${lv.budget} m ink` }),
       el('span', { class: 't', text: lv.tagline }),
-      el('span', { class: 'r', text: unlocked ? (rec.bestFrames !== null ? `best ${fmtTime(rec.bestFrames)} · ${fmtInk(rec.bestInk)} · ${rec.bestTrick} pts` : 'no record yet') : 'complete the previous level' }),
+      el('span', { class: 'r', text: unlocked ? (rec.bestFrames !== null ? `${done}/${lv.objectives.length} objectives · best ${fmtTime(rec.bestFrames)} · ${fmtInk(rec.bestInk)} · ${rec.bestTrick} pts` : 'no record yet') : 'complete the previous level' }),
     ]);
   }
 
@@ -209,18 +230,20 @@ export class Screens {
     };
     renderRiders();
     const env = ENVIRONMENTS[level.environment];
+    const earned = g.progress.earned(level);
+    const earnedCount = earned.filter(Boolean).length;
     this.mount(
       'intro',
       this.panel('narrow intro', [
-        el('div', { class: 'eyebrow', text: `${REGIONS.find((r) => r.id === level.region)?.name ?? ''} · ${level.mode.toUpperCase()}${coop ? ' · CO-OP' : ''}` }),
+        el('div', { class: 'eyebrow', text: `${REGIONS.find((r) => r.id === level.region)?.name ?? ''} · ${level.mode.toUpperCase()}${coop ? ' · CO-OP' : ''} · ${earnedCount}/${level.objectives.length} EARNED` }),
         el('h2', { text: level.name }),
         el('p', { class: 'tag', text: level.tagline }),
         el('p', { class: 'brief', text: level.briefing }),
         el('div', { class: 'gimmick', style: `--a:${env.visuals.accent}` }, [el('b', { text: env.name }), ` · ${env.gimmick}`]),
-        el('div', { class: 'objectives-list' }, level.objectives.map((o) => el('div', { class: `obj${o.optional ? ' optional' : ''}` }, [
-          el('span', { class: 'mark', text: '◇' }),
+        el('div', { class: 'objectives-list' }, level.objectives.map((o, i) => el('div', { class: `obj${earned[i] ? ' done' : ''}${o.optional ? ' optional' : ''}` }, [
+          el('span', { class: 'mark', text: earned[i] ? '◆' : '◇' }),
           el('span', { text: objectiveLabel(o) }),
-          o.optional ? el('span', { class: 'tag', text: 'MEDAL' }) : null,
+          earned[i] ? el('span', { class: 'tag earned', text: 'EARNED' }) : o.optional ? el('span', { class: 'tag', text: 'MEDAL' }) : null,
         ]))),
         el('div', { class: 'row wrap' }, [
           el('span', { class: 'pill', text: `INK ${coop ? Math.round(level.budget * 0.6) + ' m each' : level.budget + ' m'}` }),
@@ -253,7 +276,9 @@ export class Screens {
     const color = info.complete ? '#4dff9d' : '#ff3d7f';
     const imp = info.improvements;
     const badges: HTMLElement[] = [];
-    if (imp?.newMedal) badges.push(el('span', { class: 'badge', text: `NEW MEDAL: ${info.medal.toUpperCase()}` }));
+    const rec = info.level && info.mode === 'campaign' ? g.progress.level(info.level.id) : null;
+    if (imp?.newMedal && rec) badges.push(el('span', { class: 'badge', text: `NEW MEDAL: ${rec.medal.toUpperCase()}` }));
+    if (imp?.newObjectives.length) badges.push(el('span', { class: 'badge', text: `${imp.newObjectives.length} NEW OBJECTIVE${imp.newObjectives.length > 1 ? 'S' : ''}` }));
     if (imp?.newTime) badges.push(el('span', { class: 'badge', text: 'NEW BEST TIME' }));
     if (imp?.newInk) badges.push(el('span', { class: 'badge', text: 'LEAST INK' }));
     if (imp?.newTrick) badges.push(el('span', { class: 'badge', text: info.mode === 'arcade' ? 'NEW BEST DISTANCE' : 'NEW TRICK RECORD' }));
@@ -269,12 +294,17 @@ export class Screens {
       info.level?.mode === 'delivery' ? this.stat('CARGO', s.cargoLost ? 'LOST' : `${s.cargoIntegrity}%`) : null,
       info.level?.mode === 'destruction' ? this.stat('CHAOS', `${s.chaos}`) : null,
     ]);
+    const newSet = new Set(imp?.newObjectives ?? []);
     const objectives = info.results.length
-      ? el('div', { class: 'objectives-list' }, info.results.map((r) => el('div', { class: `obj${r.done ? ' done' : ''}${r.objective.optional ? ' optional' : ''}` }, [
-          el('span', { class: 'mark', text: r.done ? '◆' : '◇' }),
-          el('span', { text: objectiveLabel(r.objective) }),
-          r.objective.optional ? el('span', { class: 'tag', text: 'MEDAL' }) : null,
-        ])))
+      ? el('div', { class: 'objectives-list' }, info.results.map((r, i) => {
+          const isNew = newSet.has(i);
+          const kept = !isNew && !!info.earned[i];
+          return el('div', { class: `obj${r.done ? ' done' : ''}${r.objective.optional ? ' optional' : ''}` }, [
+            el('span', { class: 'mark', text: r.done ? '◆' : '◇' }),
+            el('span', { text: objectiveLabel(r.objective) }),
+            isNew ? el('span', { class: 'tag new', text: 'NEW' }) : kept ? el('span', { class: 'tag earned', text: 'EARNED' }) : r.objective.optional ? el('span', { class: 'tag', text: 'MEDAL' }) : null,
+          ]);
+        }))
       : null;
     const buttons: HTMLElement[] = [
       el('button', { class: 'btn', text: 'RETRY (keep lines)', onClick: () => { this.hide(); g.restart(true); } }),
@@ -289,7 +319,7 @@ export class Screens {
       'results',
       this.panel('narrow results', [
         el('h2', { text: heading, style: `color:${color}` }),
-        info.level ? el('p', { class: 'muted', text: info.level.name }) : null,
+        info.level ? el('p', { class: 'muted', text: rec ? `${info.level.name} · ${info.earned.filter(Boolean).length}/${info.level.objectives.length} objectives earned · ${rec.medal === 'none' ? 'no medal yet' : `${rec.medal} medal`}` : info.level.name }) : null,
         info.mode === 'campaign' || info.mode === 'daily' ? el('div', { class: `medal-big medal-${info.medal}` }, [el('span', { text: info.medal === 'none' ? 'no medal' : `${info.medal} medal` })]) : null,
         badges.length ? el('div', { class: 'row wrap' }, badges) : null,
         stats,
@@ -301,6 +331,106 @@ export class Screens {
 
   private stat(k: string, v: string): HTMLElement {
     return el('div', { class: 'stat' }, [el('span', { class: 'k', text: k }), el('span', { class: 'v', text: v })]);
+  }
+
+  // ------------------------------------------------------------------ lifetime stats
+
+  stats(): void {
+    const g = this.game;
+    const st = g.progress.stats;
+    const medals = g.progress.totalMedals();
+    const obj = g.progress.objectiveTotals(LEVELS);
+    const levelsDone = LEVELS.filter((l) => g.progress.isComplete(l.id)).length;
+    const daily = Object.values(g.progress.data.daily);
+    const pct = (a: number, b: number) => (b ? ` (${Math.round((a / b) * 100)}%)` : '');
+    const n = (v: number) => `${Math.round(v)}`;
+    const mode = (k: string) => st.runsByMode[k] ?? 0;
+    const section = (title: string, tiles: HTMLElement[]): HTMLElement[] => [el('h3', { text: title }), el('div', { class: 'stat-grid' }, tiles)];
+    const table = (title: string, rows: [string, string][]): HTMLElement[] =>
+      rows.length ? [el('h3', { text: title }), el('table', { class: 'stats-table' }, rows.map(([k, v]) => el('tr', {}, [el('td', { text: k }), el('td', { class: 'v', text: v })])))] : [];
+    const ranked = (m: Record<string, number>) => Object.entries(m).sort((a, b) => b[1] - a[1]);
+    const first = st.firstPlayed ? new Date(st.firstPlayed).toLocaleDateString() : 'today';
+    this.mount(
+      'stats',
+      this.panel('wide', [
+        el('div', { class: 'row between' }, [el('h2', { text: 'LIFETIME STATS' }), el('button', { class: 'btn', text: '← menu', onClick: () => this.title() })]),
+        el('p', { class: 'stats-intro', text: `Playing since ${first} · ${st.sessions} session${st.sessions === 1 ? '' : 's'} · ${fmtDuration(st.playSeconds)} with the game open · ${fmtDuration(st.framesRidden / 40)} on the board` }),
+        ...section('RIDING', [
+          this.stat('RUNS', n(st.runs)),
+          this.stat('FINISHED', `${st.finished}${pct(st.finished, st.runs)}`),
+          this.stat('CRASHES', n(st.crashes)),
+          this.stat('ABANDONED', n(st.aborted)),
+          this.stat('DISTANCE', fmtDistance(st.distance)),
+          this.stat('TOP SPEED', `${(st.topSpeed * 3.6).toFixed(0)} km/h`),
+          this.stat('LONGEST RUN', fmtTime(st.longestRunFrames)),
+          this.stat('RESTARTS', n(st.restarts)),
+          this.stat('PAUSES', n(st.pauses)),
+          this.stat('FLAGS PLANTED', n(st.flagsSet)),
+        ]),
+        ...section('TRICKS', [
+          this.stat('TRICK POINTS', n(st.trickScore)),
+          this.stat('BEST RUN', n(st.bestTrickRun)),
+          this.stat('BEST COMBO', `x${st.bestCombo}`),
+          this.stat('AIRTIME', fmtDuration(st.airtimeFrames / 40)),
+          this.stat('LONGEST AIR', `${(st.bestAirFrames / 40).toFixed(1)}s`),
+          this.stat('FLIPS', n(st.flips)),
+          this.stat('BACKFLIPS', n(st.backflips)),
+          this.stat('FRONTFLIPS', n(st.frontflips)),
+          this.stat('NEAR MISSES', n(st.nearMisses)),
+          this.stat('HUGE DROPS', n(st.hugeDrops)),
+          this.stat('CLEAN LANDINGS', n(st.cleanLandings)),
+          this.stat('MANUALS', n(st.manuals)),
+          this.stat('GRIND TIME', fmtDuration(st.grindFrames / 40)),
+        ]),
+        ...section('ADVENTURE', [
+          this.stat('LEVELS DONE', `${levelsDone}/${LEVELS.length}`),
+          this.stat('OBJECTIVES', `${obj.done}/${obj.total}`),
+          this.stat('BRONZE', n(medals.bronze)),
+          this.stat('SILVER', n(medals.silver)),
+          this.stat('GOLD', n(medals.gold)),
+          this.stat('FLAGS GRABBED', n(st.flagsCollected)),
+          this.stat('RESCUED', n(st.rescued)),
+          this.stat('CARGO DELIVERED', n(st.cargoDelivered)),
+          this.stat('CARGO LOST', n(st.cargoLost)),
+          this.stat('CHAOS', n(st.chaos)),
+          this.stat('DETONATIONS', n(st.detonations)),
+          this.stat('WALLS SMASHED', n(st.wallsSmashed)),
+          this.stat('LINES CRUMBLED', n(st.crumbles)),
+          this.stat('RECORDS BROKEN', n(st.recordsBroken)),
+        ]),
+        ...section('DRAWING', [
+          this.stat('INK DRAWN', fmtDistance(st.inkDrawn)),
+          this.stat('LINES DRAWN', n(st.linesDrawn)),
+          this.stat('LINES ERASED', n(st.linesErased)),
+          this.stat('LINES FLIPPED', n(st.linesFlipped)),
+          this.stat('UNDOS', n(st.undos)),
+          this.stat('REDOS', n(st.redos)),
+          this.stat('OBJECTS PLACED', n(st.objectsPlaced)),
+          this.stat('OBJECTS ERASED', n(st.objectsErased)),
+          this.stat('RAN DRY', n(st.inkRunOuts)),
+        ]),
+        ...section('MODES', [
+          this.stat('DAILY DAYS', n(daily.length)),
+          this.stat('DAILY FINISHED', n(daily.filter((d) => d.time !== null).length)),
+          this.stat('RUSH RUNS', n(mode('arcade'))),
+          this.stat('RUSH DISTANCE', fmtDistance(st.arcadeDistance)),
+          this.stat('RUSH BEST', `${g.progress.data.arcadeBest} m`),
+          this.stat('CO-OP RUNS', n(mode('coop'))),
+          this.stat('PEN HANDOVERS', n(st.coopSwitches)),
+          this.stat('FREE RIDES', n(mode('free'))),
+          this.stat('COMMUNITY RUNS', n(mode('library'))),
+          this.stat('PUBLISHED', n(st.tracksPublished)),
+          this.stat('CODES IMPORTED', n(st.codesImported)),
+          this.stat('CODES SHARED', n(st.codesShared)),
+          this.stat('LIKES GIVEN', n(st.likesGiven)),
+        ]),
+        ...table('BY RIDER', ranked(st.runsByRider).map(([k, v]) => [RIDERS[k as RiderId]?.name ?? k, `${v} runs · ${fmtDistance(st.distanceByRider[k] ?? 0)}`])),
+        ...table('BY WORLD', ranked(st.runsByEnvironment).map(([k, v]) => [ENVIRONMENTS[k as EnvironmentId]?.name ?? k, `${v} runs · ${fmtDistance(st.distanceByEnvironment[k] ?? 0)}`])),
+        ...table('INK BY MATERIAL', ranked(st.inkByMaterial).map(([k, v]) => [MATERIALS[k as MaterialId]?.name ?? k, fmtDistance(v)])),
+        ...table('OBJECTS PLACED', ranked(st.objectsByKind).map(([k, v]) => [OBJECT_KINDS.find((o) => o.id === k)?.name ?? k, `${v}`])),
+        ...table('HOW RUNS ENDED', ranked(st.failsByReason).map(([k, v]) => [k, `${v}`])),
+      ]),
+    );
   }
 
   // ------------------------------------------------------------------ pause
@@ -441,6 +571,8 @@ export class Screens {
               const env = ENVIRONMENTS[decoded.environment] ?? ENVIRONMENTS.mountain;
               const track = Game_trackForThumb(decoded.track);
               g.store.publish({ ...decoded, thumbnail: Renderer.thumbnail(track, 320, 180, env) });
+              g.progress.bump('codesImported');
+              g.progress.save();
               this.library('mine');
             },
           }),
@@ -463,12 +595,14 @@ export class Screens {
         el('div', { class: 'muted small', text: `best ${fmtTime(t.records.bestFrames)} · ${fmtInk(t.records.bestInk)} · ${t.records.bestTrick} pts · ${t.plays} plays` }),
         el('div', { class: 'row wrap' }, [
           el('button', { class: 'btn primary small', text: 'PLAY', onClick: () => { g.playLibrary(t); this.hide(); this.onEnterGame(); } }),
-          el('button', { class: `btn small${t.liked ? ' active' : ''}`, text: `♥ ${t.likes}`, onClick: () => { t.liked = !t.liked; t.likes += t.liked ? 1 : -1; g.store.update(t); refresh(); } }),
+          el('button', { class: `btn small${t.liked ? ' active' : ''}`, text: `♥ ${t.likes}`, onClick: () => { t.liked = !t.liked; t.likes += t.liked ? 1 : -1; if (t.liked) { g.progress.bump('likesGiven'); g.progress.save(); } g.store.update(t); refresh(); } }),
           el('button', {
             class: 'btn small',
             text: 'SHARE CODE',
             onClick: async () => {
               const code = encodeShareCode(t);
+              g.progress.bump('codesShared');
+              g.progress.save();
               try {
                 await navigator.clipboard.writeText(code);
                 alert('Share code copied to the clipboard.');
@@ -524,6 +658,8 @@ export class Screens {
                 thumbnail: Renderer.thumbnail(track, 320, 180, g.environment),
                 track: track.toJSON(),
               });
+              g.progress.bump('tracksPublished');
+              g.progress.save();
               alert(`Published "${pub.title}". Share code copied? Use the library card to copy it.`);
               this.library('mine');
             },

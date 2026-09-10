@@ -34,6 +34,14 @@ interface Command {
 export interface EditorEvents {
   onInkExhausted?: () => void;
   onEdit?: () => void;
+  /** A line was drawn: its length in metres and material. */
+  onLineDrawn?: (metres: number, material: MaterialId) => void;
+  /** The eraser removed lines and/or objects. */
+  onErased?: (lines: number, objects: number) => void;
+  onObjectPlaced?: (kind: string) => void;
+  onFlip?: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 /** Mouse/touch driven track editing with undo/redo and budget enforcement. */
@@ -193,6 +201,7 @@ export class Editor {
     if (placement.prop) cmd.addedProps!.push(this.track.addProp(placement.prop));
     this.undoStack.push(cmd);
     this.redoStack.length = 0;
+    this.events.onObjectPlaced?.(kind.id);
     this.events.onEdit?.();
     return true;
   }
@@ -356,6 +365,7 @@ export class Editor {
     });
     if (!this.current) this.current = { added: [], removed: [] };
     this.current.added.push({ ...line });
+    this.events.onLineDrawn?.(Math.hypot(line.x2 - line.x1, line.y2 - line.y1) / PX_PER_METER, material);
     this.events.onEdit?.();
     return line;
   }
@@ -391,7 +401,10 @@ export class Editor {
         }
       }
     }
-    if (hits.length || hitObjects) this.events.onEdit?.();
+    if (hits.length || hitObjects) {
+      this.events.onErased?.(hits.length, hitObjects);
+      this.events.onEdit?.();
+    }
   }
 
   private flip(id: number): void {
@@ -399,6 +412,7 @@ export class Editor {
     if (!l) return;
     if (l.layer === 'level' && !this.constraints.canEraseLevel) return;
     this.track.flipLine(id);
+    this.events.onFlip?.();
     this.events.onEdit?.();
   }
 
@@ -435,6 +449,7 @@ export class Editor {
     for (const o of cmd.addedProps ?? []) this.track.removeProp(o.id);
     for (const o of cmd.removedProps ?? []) this.track.addProp(o.def, o.id);
     this.redoStack.push(cmd);
+    this.events.onUndo?.();
     this.events.onEdit?.();
   }
 
@@ -448,6 +463,7 @@ export class Editor {
     for (const o of cmd.removedProps ?? []) this.track.removeProp(o.id);
     for (const o of cmd.addedProps ?? []) this.track.addProp(o.def, o.id);
     this.undoStack.push(cmd);
+    this.events.onRedo?.();
     this.events.onEdit?.();
   }
 

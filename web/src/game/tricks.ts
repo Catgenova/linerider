@@ -16,6 +16,7 @@ export interface TrickEvent {
 export class TrickTracker {
   score = 0;
   combo = 0;
+  maxCombo = 0;
   comboTimer = 0;
   airtimeFrames = 0;
   flips = 0;
@@ -198,6 +199,7 @@ export class TrickTracker {
 
   private award(name: string, base: number, x: number, y: number, out: TrickEvent[]): void {
     this.combo++;
+    this.maxCombo = Math.max(this.maxCombo, this.combo);
     this.comboTimer = 100;
     const mult = Math.min(3, 1 + (this.combo - 1) * 0.25);
     const points = Math.round(base * mult);

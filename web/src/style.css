@@ -282,3 +282,15 @@ button, .btn, .big-btn, .chip, .map-node, .env-card, .rider-card, .level-card, .
   .big-btn { padding: 8px 12px; }
   .map-area { min-height: 160px; }
 }
+
+/* ---------------------------------------------------------------- objectives and stats */
+.level-card .pips { position: absolute; right: 12px; top: 12px; display: flex; gap: 5px; }
+.pip { display: block; width: 7px; height: 7px; transform: rotate(45deg); border: 1px solid var(--muted); opacity: 0.55; }
+.pip.on { background: var(--lime); border-color: var(--lime); box-shadow: 0 0 6px var(--lime); opacity: 1; }
+.pip.opt.on { background: var(--yellow); border-color: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+.obj .tag.new { color: var(--lime); border-color: rgba(198, 255, 74, 0.5); }
+.obj .tag.earned { color: var(--muted); border-color: rgba(138, 146, 200, 0.4); }
+.stats-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 8px; }
+.stats-table td { padding: 4px 8px; border-bottom: 1px solid rgba(57, 246, 255, 0.1); }
+.stats-table td.v { text-align: right; font-family: var(--font-head); font-size: 12px; color: #fff; white-space: nowrap; }
+.stats-intro { font-size: 13px; color: var(--muted); margin: 0 0 6px; }

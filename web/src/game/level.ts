@@ -181,18 +181,28 @@ export interface ObjectiveResult {
   done: boolean;
 }
 
+/**
+ * Medal for a set of earned objectives (one flag per objective, in level order): bronze once every
+ * required objective is earned, silver with at least half of the optional ones, gold with all.
+ */
+export function medalFromObjectives(level: LevelDef, done: boolean[]): { medal: Medal; complete: boolean } {
+  let complete = true;
+  let optional = 0;
+  let optionalDone = 0;
+  level.objectives.forEach((o, i) => {
+    if (o.optional) {
+      optional++;
+      if (done[i]) optionalDone++;
+    } else if (!done[i]) complete = false;
+  });
+  let medal: Medal = 'none';
+  if (complete) medal = optional === 0 || optionalDone === optional ? 'gold' : optionalDone * 2 >= optional ? 'silver' : 'bronze';
+  return { medal, complete };
+}
+
 export function evaluateLevel(level: LevelDef, s: RunSummary): { results: ObjectiveResult[]; medal: Medal; complete: boolean } {
   const results = level.objectives.map((objective) => ({ objective, done: evaluateObjective(objective, s) }));
-  const primary = results.filter((r) => !r.objective.optional);
-  const optional = results.filter((r) => r.objective.optional);
-  const complete = primary.every((r) => r.done);
-  let medal: Medal = 'none';
-  if (complete) {
-    const done = optional.filter((r) => r.done).length;
-    if (optional.length === 0 || done === optional.length) medal = 'gold';
-    else if (done * 2 >= optional.length) medal = 'silver';
-    else medal = 'bronze';
-  }
+  const { medal, complete } = medalFromObjectives(level, results.map((r) => r.done));
   return { results, medal, complete };
 }
 

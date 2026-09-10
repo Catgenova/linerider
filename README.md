@@ -65,7 +65,10 @@ screen for a full-screen app.
 
 - **Adventure** – eight regions, 32 levels, an overworld map. Each level ships partially built
   terrain, a goal, an ink budget and a set of medal objectives (airtime, flips, ink used, time,
-  no crash, near misses, huge drops…). Bronze completes it, silver and gold need the optional ones.
+  no crash, near misses, huge drops…). Objectives you satisfy in a completed run stay earned, and a
+  level's medal follows what you have earned so far: bronze for the required objectives, silver
+  with half of the optional ones, gold with all. The map, level cards and title count objectives
+  earned rather than levels passed.
   Level types: reach, puzzle (tiny budgets), stunt, flags, delivery (fragile cargo), rescue
   (pick up stranded techs), destruction (chaos score), boss (avalanche, rockslide, collapsing
   clock tower, rolling moonball, the machine core).
@@ -83,6 +86,11 @@ screen for a full-screen app.
   as a translucent rider in lockstep with your current attempt.
 - **Title demo** – the menu plays an endless generated ride behind itself, cycling through the
   environments and riders.
+- **Lifetime stats** – every run in every mode feeds a stats page: runs, finishes, crashes and how
+  runs ended, distance, time on the board, top speed, longest run, tricks by type, best combo,
+  airtime, ink drawn per material, lines erased and flipped, undos, objects placed, flags,
+  rescues, cargo, chaos, detonations, medals and objectives, daily and Rush tallies, co-op
+  handovers, published tracks and share codes, with tables by rider and by world.
 
 ## Materials
 

@@ -11,7 +11,7 @@ import { evaluateLevel, type LevelDef, type Medal, type ObjectiveResult, type Ru
 import { LEVELS, REGIONS, levelById, nextLevel } from './levels';
 import { trackFromLevel } from './loadLevel';
 import { LocalTrackStore, type PublishedTrack } from './library';
-import { Progress } from './progress';
+import { Progress, type Improvements } from './progress';
 import { RIDERS, RIDER_ORDER, type RiderDef, type RiderId } from './riders';
 import { Run } from './run';
 import { Track } from './track';
@@ -34,7 +34,9 @@ export interface ResultsInfo {
   results: ObjectiveResult[];
   medal: Medal;
   complete: boolean;
-  improvements: { newMedal: boolean; newTime: boolean; newInk: boolean; newTrick: boolean } | null;
+  improvements: Improvements | null;
+  /** Objectives earned on this level so far, after this run (campaign only). */
+  earned: boolean[];
   arcadeBest?: number;
   next: LevelDef | null;
 }
@@ -50,7 +52,11 @@ export class Game {
   readonly camera = new Camera();
   readonly renderer: Renderer;
   readonly effects = new Effects();
-  readonly progress = new Progress();
+  readonly progress = new Progress(LEVELS);
+  private readonly harvested = new WeakSet<Run>();
+  private runTopSpeed = 0;
+  private lastContactFrame = -1000;
+  private saveTimer = 0;
   readonly audio: GameAudio;
   readonly store = new LocalTrackStore(BUILTIN_TRACKS);
   track = new Track();
@@ -103,9 +109,29 @@ export class Game {
   }
 
   private bindEditorEvents(): void {
+    const st = this.progress;
     this.editor.events = {
-      onInkExhausted: () => this.callbacks.onMessage('OUT OF INK', '#ff3d7f'),
+      onInkExhausted: () => {
+        this.callbacks.onMessage('OUT OF INK', '#ff3d7f');
+        st.bump('inkRunOuts');
+      },
       onEdit: () => this.callbacks.onStateChange(),
+      onLineDrawn: (metres, material) => {
+        st.bump('inkDrawn', metres);
+        st.bump('linesDrawn');
+        st.bumpMap('inkByMaterial', material, metres);
+      },
+      onErased: (lines, objects) => {
+        st.bump('linesErased', lines);
+        st.bump('objectsErased', objects);
+      },
+      onObjectPlaced: (kind) => {
+        st.bump('objectsPlaced');
+        st.bumpMap('objectsByKind', kind);
+      },
+      onFlip: () => st.bump('linesFlipped'),
+      onUndo: () => st.bump('undos'),
+      onRedo: () => st.bump('redos'),
     };
     this.track.onChange = null;
     this.previewRevision = -1;
@@ -336,7 +362,17 @@ export class Game {
   }
 
   private startRun(skipFrames: number): void {
+    this.harvest(this.run);
     this.run?.dispose();
+    this.runTopSpeed = 0;
+    this.lastContactFrame = -1000;
+    if (this.mode !== 'attract') {
+      const st = this.progress;
+      st.bump('runs');
+      st.bumpMap('runsByMode', this.mode);
+      st.bumpMap('runsByRider', this.riderDef.id);
+      st.bumpMap('runsByEnvironment', this.environment.id);
+    }
     this.run = new Run({
       track: this.track,
       level: this.level,
@@ -359,6 +395,7 @@ export class Game {
   pause(): void {
     if (this.playState !== 'play') return;
     this.playState = 'pause';
+    this.progress.bump('pauses');
     this.callbacks.onStateChange();
   }
 
@@ -369,6 +406,7 @@ export class Game {
 
   /** Stop playback and return to editing at frame zero. */
   stop(): void {
+    this.harvest(this.run);
     this.run?.dispose();
     this.run = null;
     this.playState = 'edit';
@@ -383,6 +421,7 @@ export class Game {
 
   /** Restart the run. With keepLines=false the player's drawing is wiped. */
   restart(keepLines: boolean): void {
+    if (this.mode !== 'attract') this.progress.bump('restarts');
     this.stop();
     if (!keepLines) {
       this.editor.clearPlayerLines();
@@ -403,6 +442,7 @@ export class Game {
   setFlag(): void {
     if (!this.run) return;
     this.flagFrame = this.run.frame;
+    this.progress.bump('flagsSet');
     this.callbacks.onMessage(`FLAG SET AT ${(this.flagFrame / SIM_FPS).toFixed(1)}s`, '#39f6ff');
     this.callbacks.onStateChange();
   }
@@ -454,6 +494,7 @@ export class Game {
     this.coop.player = this.coop.player === 1 ? 2 : 1;
     this.editor.constraints.player = this.coop.player;
     this.editor.constraints.budget = this.coop.budgets[this.coop.player - 1];
+    this.progress.bump('coopSwitches');
     this.callbacks.onMessage(`PLAYER ${this.coop.player} DRAWING`, this.coop.player === 1 ? '#39f6ff' : '#ff2bd6');
     this.callbacks.onStateChange();
   }
@@ -472,6 +513,12 @@ export class Game {
     if (dt > 0.25) dt = 0.25;
     this.time += dt;
     this.renderer.resize(this.camera);
+    this.progress.stats.playSeconds += dt;
+    this.saveTimer += dt;
+    if (this.saveTimer >= 30) {
+      this.saveTimer = 0;
+      this.progress.save();
+    }
 
     if (this.playState === 'play' && this.run) {
       this.accumulator += dt * 1000 * this.speed;
@@ -518,6 +565,7 @@ export class Game {
       if (!this.resultsPending) return;
     }
     run.step();
+    this.sampleSpeed(run);
     if (this.ghostRun && this.ghostEnabled) this.ghostRun.step();
     if (this.arcade) this.arcade.update(run, this.editor);
     this.consumeRunEvents(run);
@@ -576,11 +624,14 @@ export class Game {
     for (const ev of run.world.events) {
       if (ev.type === 'crumble') {
         fx.shards(ev.line.x1, ev.line.y1, ev.line.x2, ev.line.y2, '#ff7a45');
+        if (!this.attract) this.progress.bump('crumbles');
       } else if (ev.type === 'break') {
         fx.shards(ev.line.x1, ev.line.y1, ev.line.x2, ev.line.y2, '#ffb347');
         fx.popup(ev.x, ev.y - 10, 'SMASH', '#ffb347', 1.2);
         fx.shake = Math.max(fx.shake, 5);
+        if (!this.attract) this.progress.bump('wallsSmashed');
       } else if (ev.type === 'explode') {
+        if (!this.attract) this.progress.bump('detonations');
         this.audio.explosion();
         fx.explosion(ev.x, ev.y, ev.radius);
         fx.popup(ev.x, ev.y - 30, 'BOOM', '#ffb347', 1.5);
@@ -617,16 +668,79 @@ export class Game {
     }
   }
 
+  /** Track the run's top speed, counting only moments on or just off the track so endless falls do not count. */
+  private sampleSpeed(run: Run): void {
+    const rider = run.rider;
+    if (rider.dead) return;
+    for (const i of rider.model.vehicle) {
+      if (rider.points[i].contact) {
+        this.lastContactFrame = run.frame;
+        break;
+      }
+    }
+    if (run.frame - this.lastContactFrame > SIM_FPS) return;
+    const v = rider.velocity();
+    const speed = Math.hypot(v.x, v.y);
+    if (speed > this.runTopSpeed) this.runTopSpeed = speed;
+  }
+
+  /** Fold a run's numbers into the lifetime statistics, once per run. Demo rides are skipped. */
+  private harvest(run: Run | null): void {
+    if (!run || this.harvested.has(run) || this.mode === 'attract') return;
+    this.harvested.add(run);
+    if (run.frame === 0) return;
+    const st = this.progress;
+    const s = run.summary();
+    const t = run.tricks;
+    const distance = Math.max(0, s.distance);
+    st.bump('framesRidden', s.survivedFrames);
+    st.bump('distance', distance);
+    st.bumpMap('distanceByRider', run.riderDef.id, distance);
+    st.bumpMap('distanceByEnvironment', this.environment.id, distance);
+    st.bumpMax('longestRunFrames', s.frames);
+    st.bumpMax('topSpeed', (this.runTopSpeed * SIM_FPS) / PX_PER_METER);
+    st.bump('airtimeFrames', t.airtimeFrames);
+    st.bumpMax('bestAirFrames', t.bestAir);
+    st.bump('flips', t.flips);
+    st.bump('backflips', t.backflips);
+    st.bump('frontflips', t.frontflips);
+    st.bump('trickScore', t.score);
+    st.bumpMax('bestTrickRun', t.score);
+    st.bumpMax('bestCombo', t.maxCombo);
+    st.bump('nearMisses', t.nearMisses);
+    st.bump('hugeDrops', t.hugeDrops);
+    st.bump('cleanLandings', t.cleanLandings);
+    st.bump('manuals', t.manuals);
+    st.bump('grindFrames', t.grindFrames);
+    st.bump('flagsCollected', s.flagsCollected);
+    st.bump('rescued', s.rescued);
+    st.bump('chaos', s.chaos);
+    if (s.cargoLost) st.bump('cargoLost');
+    if (run.level?.mode === 'delivery' && s.finished && !s.cargoLost) st.bump('cargoDelivered');
+    if (s.finished) {
+      st.bump('finished');
+      st.bumpMap('finishedByMode', this.mode);
+    }
+    if (s.died) st.bump('crashes');
+    if (run.done) {
+      if (s.failReason) st.bumpMap('failsByReason', s.failReason);
+    } else st.bump('aborted');
+    if (this.mode === 'arcade') st.bump('arcadeDistance', distance);
+    st.save();
+  }
+
   private finishRun(): void {
     const run = this.run!;
     const summary = run.summary();
     this.resultsPending = false;
     this.playState = 'pause';
     const level = this.level;
+    this.harvest(run);
     let results: ObjectiveResult[] = [];
     let medal: Medal = 'none';
     let complete = summary.finished;
     let improvements: ResultsInfo['improvements'] = null;
+    let earned: boolean[] = [];
     let arcadeBest: number | undefined;
     if (level) {
       const ev = evaluateLevel(level, summary);
@@ -635,10 +749,12 @@ export class Game {
       complete = ev.complete;
       if (this.mode === 'campaign' && complete) {
         const ghost = summary.finished ? { track: this.track.toJSON(), rider: this.riderDef.id, frames: summary.frames } : null;
-        improvements = this.progress.recordResult(level.id, medal, summary.finished ? summary.frames : null, summary.inkUsed, summary.trickScore, ghost);
+        improvements = this.progress.recordResult(level, results, summary.finished ? summary.frames : null, summary.inkUsed, summary.trickScore, ghost);
+        const broken = (improvements.newTime ? 1 : 0) + (improvements.newInk ? 1 : 0) + (improvements.newTrick ? 1 : 0);
+        if (broken) this.progress.bump('recordsBroken', broken);
       } else if (this.mode === 'daily' && this.dailyKey) {
         const rec = this.progress.data.daily[this.dailyKey] ?? { time: null, ink: null, trick: 0 };
-        improvements = { newMedal: false, newTime: false, newInk: false, newTrick: false };
+        improvements = { newMedal: false, newObjectives: [], newTime: false, newInk: false, newTrick: false };
         if (summary.finished && (rec.time === null || summary.frames < rec.time)) {
           rec.time = summary.frames;
           improvements.newTime = true;
@@ -652,18 +768,22 @@ export class Game {
           improvements.newTrick = true;
         }
         this.progress.data.daily[this.dailyKey] = rec;
+        const broken = (improvements.newTime ? 1 : 0) + (improvements.newInk ? 1 : 0) + (improvements.newTrick ? 1 : 0);
+        if (broken) this.progress.bump('recordsBroken', broken);
         this.progress.save();
       }
+      if (this.mode === 'campaign') earned = this.progress.earned(level);
     } else if (this.mode === 'arcade') {
       arcadeBest = this.progress.data.arcadeBest;
       if (summary.distance > arcadeBest) {
         this.progress.data.arcadeBest = Math.round(summary.distance);
+        this.progress.bump('recordsBroken');
         this.progress.save();
-        improvements = { newMedal: false, newTime: false, newInk: false, newTrick: true };
+        improvements = { newMedal: false, newObjectives: [], newTime: false, newInk: false, newTrick: true };
       }
     } else if (this.mode === 'library' && this.libraryTrack && summary.finished) {
       const rec = this.libraryTrack.records;
-      improvements = { newMedal: false, newTime: false, newInk: false, newTrick: false };
+      improvements = { newMedal: false, newObjectives: [], newTime: false, newInk: false, newTrick: false };
       if (rec.bestFrames === null || summary.frames < rec.bestFrames) {
         rec.bestFrames = summary.frames;
         improvements.newTime = true;
@@ -686,6 +806,7 @@ export class Game {
       medal,
       complete,
       improvements,
+      earned,
       arcadeBest,
       next: level && this.mode === 'campaign' ? nextLevel(level.id) : null,
     });
