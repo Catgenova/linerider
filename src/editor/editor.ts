@@ -147,11 +147,41 @@ export class Editor {
     void shift;
   }
 
-  /** Drop the selected object kind at a world position. */
+  /** Surface height of the nearest rideable line directly below (or just above) a point. */
+  private surfaceBelow(x: number, y: number, reach = 80): number | null {
+    let best: number | null = null;
+    for (const l of this.track.lines.values()) {
+      if (!MATERIALS[l.material].solid) continue;
+      const minX = Math.min(l.x1, l.x2);
+      const maxX = Math.max(l.x1, l.x2);
+      if (x < minX || x > maxX || maxX === minX) continue;
+      const t = (x - l.x1) / (l.x2 - l.x1);
+      const ly = l.y1 + (l.y2 - l.y1) * t;
+      if (ly < y - 20 || ly > y + reach) continue;
+      if (best === null || ly < best) best = ly;
+    }
+    // Stacking: the top of a prop already placed under the cursor counts as a surface too.
+    for (const o of this.track.props.values()) {
+      const d = o.def;
+      const halfW = d.radius ? d.radius : (d.width ?? 10) / 2;
+      const top = d.radius ? d.y - d.radius : d.y - (d.height ?? 10) / 2;
+      if (x < d.x - halfW || x > d.x + halfW) continue;
+      if (top < y - 20 || top > y + reach) continue;
+      if (best === null || top < best) best = top;
+    }
+    return best;
+  }
+
+  /** Drop the selected object kind at a world position. Props snap onto the surface beneath. */
   placeObject(x: number, y: number): boolean {
     if (!this.constraints.canPlaceObjects || this.constraints.locked) return false;
     const kind = objectKind(this.objectKind);
-    const placement = kind.make(Math.round(x), Math.round(y));
+    let py = y;
+    if (kind.group === 'props' || kind.id === 'spring' || kind.id === 'ramp') {
+      const surface = this.surfaceBelow(x, y);
+      if (surface !== null) py = surface - 0.5;
+    }
+    const placement = kind.make(Math.round(x), Math.round(py));
     const cmd: Command = { added: [], removed: [], addedObjects: [], addedProps: [] };
     if (placement.lines) {
       for (const l of placement.lines) {

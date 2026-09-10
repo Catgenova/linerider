@@ -146,6 +146,7 @@ export class Prop {
     this.originY = c.y;
     this.disturbed = false;
     this.lastImpact = 0;
+    this.fuse = -1;
     for (const p of this.points) {
       p.px = p.x;
       p.py = p.y;

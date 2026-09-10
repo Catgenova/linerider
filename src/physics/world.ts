@@ -49,6 +49,7 @@ export class World {
   private readonly ctx: CollideContext = { frame: 0, frictionScale: 1, riderFriction: 1 };
   private readonly windOut = { x: 0, y: 0 };
   private readonly faceScratch = new Float64Array(4 * 3);
+  private settling = false;
   nextDynamicId = 1_000_000;
 
   addLine(init: LineInit): Line {
@@ -121,6 +122,7 @@ export class World {
    */
   settleProps(frames = 60): void {
     if (this.props.length === 0) return;
+    this.settling = true;
     const gx = this.gravityX * this.gravityScale;
     const gy = this.gravityY * this.gravityScale;
     for (let f = 0; f < frames; f++) {
@@ -142,6 +144,7 @@ export class World {
     this.events = [];
     this.crumbling.clear();
     for (const line of this.lines.values()) line.crumbleAt = -1;
+    this.settling = false;
   }
 
   /** Advance the world by one simulation frame. */
@@ -431,6 +434,7 @@ export class World {
     const rvy = p.y - p.py - v.y;
     const s = Math.sqrt(rvx * rvx + rvy * rvy);
     if (s > prop.lastImpact) prop.lastImpact = s;
+    if (this.settling) return;
     if (s > 2.5) {
       this.events.push({ type: 'impact', x: p.x, y: p.y, speed: s, prop });
       if (prop.explosive && prop.fuse < 0 && s > 4) prop.fuse = 3;
