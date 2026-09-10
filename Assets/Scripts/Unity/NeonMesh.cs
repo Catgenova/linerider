@@ -188,6 +188,24 @@ namespace NeonLineRider.Unity
             }
         }
 
+        /// <summary>Filled ellipse in sim px, rotated by angle (radians, screen convention).</summary>
+        public void Ellipse(double cx, double cy, double rx, double ry, double angle, Color32 color, int segments = 20)
+        {
+            double cos = Math.Cos(angle), sin = Math.Sin(angle);
+            Vector3 c = U.W(cx, cy);
+            double prevX = 0, prevY = 0;
+            for (int i = 0; i <= segments; i++)
+            {
+                double a = i / (double)segments * Math.PI * 2;
+                double lx = Math.Cos(a) * rx, ly = Math.Sin(a) * ry;
+                double x = cx + lx * cos - ly * sin;
+                double y = cy + lx * sin + ly * cos;
+                if (i > 0) TriangleUnits(c, U.W(prevX, prevY), U.W(x, y), color, color, color);
+                prevX = x;
+                prevY = y;
+            }
+        }
+
         /// <summary>Axis-aligned rectangle in sim px.</summary>
         public void Rect(double x, double y, double w, double h, Color32 color)
         {

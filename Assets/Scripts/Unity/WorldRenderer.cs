@@ -87,14 +87,14 @@ namespace NeonLineRider.Unity
             {
                 foreach (Rider rider in game.GhostRun.World.Riders)
                 {
-                    DrawRider(rider, "#e0c8ff", "#b48cff", cam.Zoom, 0.38f, false);
+                    DrawRider(rider, "#e0c8ff", "#b48cff", cam.Zoom, 0.38f, false, game.Time);
                     Vec2d c = rider.Center();
                     Label(c.X + 6, c.Y - 14, "GHOST", U.Hex("#e0c8ff", 0.5f), 4 / Math.Min(1, cam.Zoom / 2));
                 }
             }
             if (game.Run != null)
             {
-                foreach (Rider rider in game.Run.World.Riders) DrawRider(rider, game.RiderDef.Color, game.RiderDef.Glow, cam.Zoom, 1f, true);
+                foreach (Rider rider in game.Run.World.Riders) DrawRider(rider, game.RiderDef.Color, game.RiderDef.Glow, cam.Zoom, 1f, true, game.Time);
             }
             else DrawStartMarker(game, pulse);
             DrawEffects(fx, cam.Zoom);
@@ -664,14 +664,13 @@ namespace NeonLineRider.Unity
 
         // ------------------------------------------------------------------ riders
 
-        private void DrawRider(Rider rider, string colorHex, string glowHex, double zoom, float alpha, bool trail)
+        private void DrawRider(Rider rider, string colorHex, string glowHex, double zoom, float alpha, bool trail, double time)
         {
-            Point[] pts = rider.Points;
-            RiderModel model = rider.Model;
             bool dead = rider.Dead;
             Color32 color = U.Hex32(dead ? "#ff4d4d" : colorHex, alpha);
             Color32 glow = U.Hex32(dead ? "#ff2020" : glowHex, alpha);
             double core = Math.Min(2.4, Math.Max(0.8, 1.4 / Math.Sqrt(zoom)));
+            RiderPose pose = RiderPose.Compute(rider, time);
 
             if (trail && rider.Trail.Count >= 4)
             {
@@ -683,65 +682,98 @@ namespace NeonLineRider.Unity
                 }
             }
 
+            DrawHoverboard(pose, color, glow, core, alpha, time, dead);
+
             ScarfNode[] sc = rider.Scarf;
             for (int i = 1; i < sc.Length; i++)
             {
                 Color32 c = U.Hex32(i % 2 == 0 ? "#ff2bd6" : "#ffffff", (float)(alpha * (1 - (i / (double)sc.Length) * 0.6)));
-                _dynCore.Segment(sc[i - 1].X, sc[i - 1].Y, sc[i].X, sc[i].Y, core * 1.1, c);
+                _dynCore.Segment(sc[i - 1].X + pose.ScarfDx, sc[i - 1].Y + pose.ScarfDy, sc[i].X + pose.ScarfDx, sc[i].Y + pose.ScarfDy, core * 1.1, c);
             }
 
-            foreach (int[] poly in model.DrawVehicle)
-            {
-                _poly.Clear();
-                foreach (int idx in poly) _poly.Add(new Vec2dF(pts[idx].X, pts[idx].Y));
-                _dynCore.Polygon(_poly, U.Hex32("#05021a", 0.85f * alpha));
-                for (int i = 0; i < _poly.Count; i++)
-                {
-                    Vec2dF a = _poly[i], b = _poly[(i + 1) % _poly.Count];
-                    _dynGlow.Segment(a.X, a.Y, b.X, b.Y, core * 5, U.WithAlpha(glow, 0.35f * alpha));
-                    _dynCore.Segment(a.X, a.Y, b.X, b.Y, core * 1.3, color);
-                }
-            }
             Color32 body = U.Hex32("#f6f8ff", alpha);
-            foreach (int[] seg in model.DrawBody)
+            Color32 bodyGlow = U.WithAlpha(glow, 0.35f * alpha);
+            foreach (Seg s in pose.Segments)
             {
-                _dynGlow.Segment(pts[seg[0]].X, pts[seg[0]].Y, pts[seg[1]].X, pts[seg[1]].Y, core * 5, U.WithAlpha(glow, 0.35f * alpha));
-                _dynCore.Segment(pts[seg[0]].X, pts[seg[0]].Y, pts[seg[1]].X, pts[seg[1]].Y, core * 1.2, body);
+                _dynGlow.Segment(s.X1, s.Y1, s.X2, s.Y2, core * 5, bodyGlow);
+                _dynCore.Segment(s.X1, s.Y1, s.X2, s.Y2, core * 1.25, body);
+                _dynCore.Disc(s.X2, s.Y2, core * 0.55, body, 8);
             }
-            Point hip = pts[model.AnchorHip];
-            Point sh = pts[model.AnchorShoulder];
-            double hx = sh.X - hip.X;
-            double hy = sh.Y - hip.Y;
-            double hl = Math.Sqrt(hx * hx + hy * hy);
-            if (hl == 0) hl = 1;
-            hx /= hl;
-            hy /= hl;
-            double headX = sh.X + hx * model.HeadOffset;
-            double headY = sh.Y + hy * model.HeadOffset;
-            _dynGlow.Circle(headX, headY, model.HeadRadius + core * 2, core * 3, U.WithAlpha(glow, 0.3f * alpha), 16);
-            _dynCore.Disc(headX, headY, model.HeadRadius, U.Hex32("#05021a", 0.9f * alpha), 16);
-            _dynCore.Circle(headX, headY, model.HeadRadius, core, body, 16);
-            // Visor: a short arc facing the direction of travel.
-            double baseAng = Math.Atan2(hy, hx) - Math.PI / 2;
-            double vr = model.HeadRadius * 0.6;
+            double headR = rider.Model.HeadRadius;
+            Vec2d head = pose.Head;
+            _dynGlow.Circle(head.X, head.Y, headR + core * 2, core * 3, U.WithAlpha(glow, 0.3f * alpha), 16);
+            _dynCore.Disc(head.X, head.Y, headR, U.Hex32("#05021a", 0.9f * alpha), 16);
+            _dynCore.Circle(head.X, head.Y, headR, core, body, 16);
+            double baseAng = Math.Atan2(pose.HeadUp.Y, pose.HeadUp.X) - Math.PI / 2;
+            double vr = headR * 0.6;
             double a0 = baseAng + Math.PI / 4 - 0.2;
             double a1 = baseAng + Math.PI * 0.95;
-            double px = headX + Math.Cos(a0) * vr, py = headY + Math.Sin(a0) * vr;
+            double px = head.X + Math.Cos(a0) * vr, py = head.Y + Math.Sin(a0) * vr;
             for (int i = 1; i <= 6; i++)
             {
                 double a = a0 + (a1 - a0) * i / 6;
-                double x = headX + Math.Cos(a) * vr, y = headY + Math.Sin(a) * vr;
+                double x = head.X + Math.Cos(a) * vr, y = head.Y + Math.Sin(a) * vr;
                 _dynCore.Segment(px, py, x, y, core, color, false);
                 px = x;
                 py = y;
             }
             for (int i = 0; i < rider.Passengers; i++)
             {
-                double ox = sh.X - hx * 2 - (i + 1) * 4 * hy;
-                double oy = sh.Y - hy * 2 + (i + 1) * 4 * hx;
+                double ox = head.X - pose.HeadUp.X * 6 - (i + 1) * 4 * pose.HeadUp.Y;
+                double oy = head.Y - pose.HeadUp.Y * 6 + (i + 1) * 4 * pose.HeadUp.X;
                 _dynCore.Circle(ox, oy - 3, 1.6, core * 0.8, U.Hex32("#ff7ae8", alpha), 10);
                 _dynCore.Segment(ox, oy - 1.5, ox, oy + 3, core * 0.8, U.Hex32("#ff7ae8", alpha), false);
             }
+        }
+
+        /// <summary>A thin deck riding on the physics contact line, with pulsing thruster pads underneath.</summary>
+        private void DrawHoverboard(RiderPose pose, Color32 color, Color32 glow, double core, float alpha, double time, bool dead)
+        {
+            double L = pose.Length;
+            const double ext = 2.6;
+            const double th = 2.3;
+            Vec2d tail = pose.Tail;
+            double ux = pose.Ux, uy = pose.Uy, nx = pose.Nx, ny = pose.Ny;
+            Vec2dF P(double a, double h) => new Vec2dF(tail.X + ux * a + nx * h, tail.Y + uy * a + ny * h);
+            _poly.Clear();
+            _poly.Add(P(-ext, 1.3));
+            _poly.Add(P(0, 0));
+            _poly.Add(P(L, 0));
+            _poly.Add(P(L + ext, 1.3));
+            _poly.Add(P(L + ext, 1.3 + th * 0.6));
+            _poly.Add(P(L * 0.78, th + 0.5));
+            _poly.Add(P(L * 0.5, th + 0.9));
+            _poly.Add(P(L * 0.22, th + 0.5));
+            _poly.Add(P(-ext, 1.3 + th * 0.6));
+            double angle = Math.Atan2(uy, ux);
+            double pulse = 0.5 + 0.5 * Math.Sin(time * 14);
+            float padAlpha = (float)((dead ? 0.15 : 0.45 + 0.35 * pulse + Math.Min(0.3, pose.Speed * 0.03)) * alpha);
+
+            // Light spilling onto the ground under the deck.
+            Vec2dF u0 = P(-ext, 0), u1 = P(L + ext, 0), u2 = P(L + ext + 2, -6), u3 = P(-ext - 2, -6);
+            Color32 spill = U.WithAlpha(glow, (float)((dead ? 0.08 : 0.3) * alpha));
+            Color32 none = U.WithAlpha(glow, 0f);
+            _dynGlow.QuadUnits(U.W(u0.X, u0.Y), U.W(u1.X, u1.Y), U.W(u2.X, u2.Y), U.W(u3.X, u3.Y), spill, spill, none, none);
+            foreach (double a in new[] { L * 0.27, L * 0.73 })
+            {
+                Vec2dF pad = P(a, -1.3);
+                _dynGlow.Ellipse(pad.X, pad.Y, 4.4, 2.2, angle, U.WithAlpha(glow, padAlpha * 0.4f));
+                _dynGlow.Ellipse(pad.X, pad.Y, 2.1, 0.9, angle, U.Hex32("#ffffff", padAlpha * 0.9f));
+            }
+            var outline = new List<Vec2dF>(_poly);
+            for (int i = 0; i < outline.Count; i++)
+            {
+                Vec2dF a = outline[i], b = outline[(i + 1) % outline.Count];
+                _dynGlow.Segment(a.X, a.Y, b.X, b.Y, core * 4, U.WithAlpha(glow, 0.35f * alpha));
+            }
+            _dynCore.Polygon(_poly, U.Hex32("#05021a", 0.92f * alpha));
+            for (int i = 0; i < outline.Count; i++)
+            {
+                Vec2dF a = outline[i], b = outline[(i + 1) % outline.Count];
+                _dynCore.Segment(a.X, a.Y, b.X, b.Y, core * 1.2, color);
+            }
+            Vec2dF s0 = P(1.2, th + 0.1), s1 = P(L - 1.2, th + 0.1);
+            _dynCore.Segment(s0.X, s0.Y, s1.X, s1.Y, core * 0.7, U.Hex32("#ffffff", 0.55f * alpha), false);
         }
 
         private void DrawStartMarker(GameController game, double pulse)

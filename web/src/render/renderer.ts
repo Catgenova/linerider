@@ -8,6 +8,7 @@ import type { Prop } from '../physics/prop';
 import type { Rider } from '../physics/rider';
 import type { World } from '../physics/world';
 import { drawBackground } from './background';
+import { computePose, type RiderPose } from './pose';
 import type { Effects } from './effects';
 
 export interface RiderStyle {
@@ -122,7 +123,7 @@ export class Renderer {
     }
     if (scene.ghostWorld) {
       for (const rider of scene.ghostWorld.riders) {
-        this.drawRider(rider, { color: '#e0c8ff', glow: '#b48cff' }, cam.zoom, 0.38, false);
+        this.drawRider(rider, { color: '#e0c8ff', glow: '#b48cff' }, cam.zoom, 0.38, false, scene.time);
         const c = rider.center();
         ctx.save();
         ctx.globalAlpha = 0.5;
@@ -136,7 +137,7 @@ export class Renderer {
     if (scene.world) {
       scene.world.riders.forEach((rider, i) => {
         const style = scene.riderStyles[i] ?? scene.riderStyles[0] ?? { color: '#39f6ff', glow: '#00c8ff' };
-        this.drawRider(rider, style, cam.zoom, 1, true);
+        this.drawRider(rider, style, cam.zoom, 1, true, scene.time);
       });
     } else {
       this.drawStartRider(scene, pulse);
@@ -305,14 +306,13 @@ export class Renderer {
     ctx.stroke(path);
   }
 
-  private drawRider(rider: Rider, style: RiderStyle, zoom: number, alpha: number, trail: boolean): void {
+  private drawRider(rider: Rider, style: RiderStyle, zoom: number, alpha: number, trail: boolean, time: number): void {
     const { ctx } = this;
-    const pts = rider.points;
-    const model = rider.model;
     const dead = rider.dead;
     const color = dead ? '#ff4d4d' : style.color;
     const glow = dead ? '#ff2020' : style.glow;
     const core = Math.min(2.4, Math.max(0.8, 1.4 / Math.sqrt(zoom)));
+    const pose = computePose(rider, time);
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.lineCap = 'round';
@@ -333,62 +333,52 @@ export class Renderer {
       ctx.globalCompositeOperation = 'source-over';
     }
 
-    // Scarf.
+    this.drawHoverboard(pose, color, glow, core, alpha, time, dead);
+
+    // Scarf, hung from the drawn shoulders.
     const sc = rider.scarf;
     for (let i = 1; i < sc.length; i++) {
       ctx.strokeStyle = i % 2 === 0 ? '#ff2bd6' : '#ffffff';
       ctx.globalAlpha = alpha * (1 - (i / sc.length) * 0.6);
       ctx.lineWidth = core * 1.1;
       ctx.beginPath();
-      ctx.moveTo(sc[i - 1].x, sc[i - 1].y);
-      ctx.lineTo(sc[i].x, sc[i].y);
+      ctx.moveTo(sc[i - 1].x + pose.scarfDx, sc[i - 1].y + pose.scarfDy);
+      ctx.lineTo(sc[i].x + pose.scarfDx, sc[i].y + pose.scarfDy);
       ctx.stroke();
     }
     ctx.globalAlpha = alpha;
 
-    const vehicle = new Path2D();
-    for (const poly of model.draw.vehicle) {
-      vehicle.moveTo(pts[poly[0]].x, pts[poly[0]].y);
-      for (let i = 1; i < poly.length; i++) vehicle.lineTo(pts[poly[i]].x, pts[poly[i]].y);
-      vehicle.closePath();
-    }
     const body = new Path2D();
-    for (const [a, b] of model.draw.body) {
-      body.moveTo(pts[a].x, pts[a].y);
-      body.lineTo(pts[b].x, pts[b].y);
+    for (const s of pose.segments) {
+      body.moveTo(s.x1, s.y1);
+      body.lineTo(s.x2, s.y2);
     }
-    const hip = pts[model.anchor.hip];
-    const sh = pts[model.anchor.shoulder];
-    let hx = sh.x - hip.x;
-    let hy = sh.y - hip.y;
-    const hl = Math.sqrt(hx * hx + hy * hy) || 1;
-    hx /= hl;
-    hy /= hl;
-    const headX = sh.x + hx * model.draw.headOffset;
-    const headY = sh.y + hy * model.draw.headOffset;
+    const { head, headUp } = pose;
+    const headRadius = rider.model.draw.headRadius;
 
     ctx.globalCompositeOperation = 'lighter';
     ctx.strokeStyle = glow;
     ctx.globalAlpha = alpha * 0.35;
     ctx.lineWidth = core * 5;
-    ctx.stroke(vehicle);
     ctx.stroke(body);
     ctx.beginPath();
-    ctx.arc(headX, headY, model.draw.headRadius + core * 2, 0, Math.PI * 2);
+    ctx.arc(head.x, head.y, headRadius + core * 2, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = alpha;
 
-    ctx.fillStyle = 'rgba(5, 2, 20, 0.85)';
-    ctx.fill(vehicle);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = core * 1.3;
-    ctx.stroke(vehicle);
     ctx.strokeStyle = '#f6f8ff';
-    ctx.lineWidth = core * 1.2;
+    ctx.lineWidth = core * 1.25;
     ctx.stroke(body);
+    // Joints read better with small knuckles at the knees and hips.
+    ctx.fillStyle = '#f6f8ff';
+    for (const s of pose.segments) {
+      ctx.beginPath();
+      ctx.arc(s.x2, s.y2, core * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.beginPath();
-    ctx.arc(headX, headY, model.draw.headRadius, 0, Math.PI * 2);
+    ctx.arc(head.x, head.y, headRadius, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(5, 2, 20, 0.9)';
     ctx.fill();
     ctx.strokeStyle = '#f6f8ff';
@@ -397,7 +387,89 @@ export class Renderer {
     ctx.strokeStyle = color;
     ctx.lineWidth = core;
     ctx.beginPath();
-    ctx.arc(headX, headY, model.draw.headRadius * 0.6, -0.2 + Math.atan2(hy, hx) - Math.PI / 2 + Math.PI / 4, Math.atan2(hy, hx) - Math.PI / 2 + Math.PI * 0.95);
+    const baseAng = Math.atan2(headUp.y, headUp.x) - Math.PI / 2;
+    ctx.arc(head.x, head.y, headRadius * 0.6, baseAng + Math.PI / 4 - 0.2, baseAng + Math.PI * 0.95);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** A thin deck riding on the physics contact line, with pulsing thruster pads underneath. */
+  private drawHoverboard(pose: RiderPose, color: string, glow: string, core: number, alpha: number, time: number, dead: boolean): void {
+    const { ctx } = this;
+    const { tail, ux, uy, nx, ny, length: L } = pose;
+    const ext = 2.6;
+    const th = 2.3;
+    const P = (a: number, h: number): [number, number] => [tail.x + ux * a + nx * h, tail.y + uy * a + ny * h];
+    const outline: [number, number][] = [
+      P(-ext, 1.3),
+      P(0, 0),
+      P(L, 0),
+      P(L + ext, 1.3),
+      P(L + ext, 1.3 + th * 0.6),
+      P(L * 0.78, th + 0.5),
+      P(L * 0.5, th + 0.9),
+      P(L * 0.22, th + 0.5),
+      P(-ext, 1.3 + th * 0.6),
+    ];
+    const deck = new Path2D();
+    deck.moveTo(outline[0][0], outline[0][1]);
+    for (let i = 1; i < outline.length; i++) deck.lineTo(outline[i][0], outline[i][1]);
+    deck.closePath();
+    const angle = Math.atan2(uy, ux);
+    const pulse = 0.5 + 0.5 * Math.sin(time * 14);
+    const padAlpha = (dead ? 0.15 : 0.45 + 0.35 * pulse + Math.min(0.3, pose.speed * 0.03)) * alpha;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    // Soft light spilling onto the ground under the deck.
+    const [gx0, gy0] = P(L / 2, -0.4);
+    const [gx1, gy1] = P(L / 2, -6);
+    const grad = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
+    grad.addColorStop(0, hexToRgba(glow, (dead ? 0.08 : 0.3) * alpha));
+    grad.addColorStop(1, hexToRgba(glow, 0));
+    ctx.fillStyle = grad;
+    const under = new Path2D();
+    const u0 = P(-ext, 0);
+    const u1 = P(L + ext, 0);
+    const u2 = P(L + ext + 2, -6);
+    const u3 = P(-ext - 2, -6);
+    under.moveTo(u0[0], u0[1]);
+    under.lineTo(u1[0], u1[1]);
+    under.lineTo(u2[0], u2[1]);
+    under.lineTo(u3[0], u3[1]);
+    under.closePath();
+    ctx.fill(under);
+    // Thruster pads.
+    for (const a of [L * 0.27, L * 0.73]) {
+      const [px, py] = P(a, -1.3);
+      ctx.fillStyle = hexToRgba(glow, padAlpha * 0.4);
+      ctx.beginPath();
+      ctx.ellipse(px, py, 4.4, 2.2, angle, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = hexToRgba('#ffffff', padAlpha * 0.9);
+      ctx.beginPath();
+      ctx.ellipse(px, py, 2.1, 0.9, angle, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = glow;
+    ctx.globalAlpha = alpha * 0.35;
+    ctx.lineWidth = core * 4;
+    ctx.stroke(deck);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = 'rgba(5, 2, 20, 0.92)';
+    ctx.fill(deck);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = core * 1.2;
+    ctx.stroke(deck);
+    // Deck highlight stripe.
+    const [sx0, sy0] = P(1.2, th + 0.1);
+    const [sx1, sy1] = P(L - 1.2, th + 0.1);
+    ctx.strokeStyle = hexToRgba('#ffffff', 0.55 * alpha);
+    ctx.lineWidth = core * 0.7;
+    ctx.beginPath();
+    ctx.moveTo(sx0, sy0);
+    ctx.lineTo(sx1, sy1);
     ctx.stroke();
     ctx.restore();
   }

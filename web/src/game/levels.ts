@@ -201,7 +201,7 @@ export const LEVELS: LevelDef[] = [
     mode: 'stunt',
     tagline: 'Send it. Land it.',
     briefing:
-      'The chute below is long and fast. Build a kicker, get Bosh upside down, and bring him back onto the landing. A flip only counts once he lands on the sled.',
+      'The chute below is long and fast. Build a kicker, get Bosh upside down, and bring him back onto the landing. A flip only counts once he lands on the board.',
     budget: 70,
     materials: ['normal', 'accel', 'booster'],
     rider: null,
@@ -520,7 +520,7 @@ export const LEVELS: LevelDef[] = [
     mode: 'delivery',
     tagline: 'Handle with care.',
     briefing:
-      'A fragile crate is strapped to the back of the sled. Every hard landing and jolt chips at it, and a violent enough hit tears it off entirely. Smooth curves beat fast drops.',
+      'A fragile crate is strapped to the back of the board. Every hard landing and jolt chips at it, and a violent enough hit tears it off entirely. Smooth curves beat fast drops.',
     budget: 120,
     materials: ['normal', 'mud', 'sticky'],
     rider: null,
@@ -1317,7 +1317,7 @@ export const LEVELS: LevelDef[] = [
     mode: 'reach',
     tagline: 'Teeth carry. Teeth also bite.',
     briefing:
-      'Spinning gears fill the chamber. Ride their rims in the direction they turn and they throw the sled forward; land against the turn and they eat the speed.',
+      'Spinning gears fill the chamber. Ride their rims in the direction they turn and they throw the board forward; land against the turn and they eat the speed.',
     budget: 70,
     materials: ['normal', 'accel'],
     rider: null,
@@ -1355,7 +1355,7 @@ export const LEVELS: LevelDef[] = [
     mode: 'reach',
     tagline: 'Some belts run the wrong way.',
     briefing:
-      'Conveyor surfaces drive the sled toward a set speed along their arrow. Pistons rise and fall between them. Use the belts that help, jump the ones that do not.',
+      'Conveyor surfaces drive the board toward a set speed along their arrow. Pistons rise and fall between them. Use the belts that help, jump the ones that do not.',
     budget: 60,
     materials: ['normal', 'conveyor', 'accel'],
     rider: null,

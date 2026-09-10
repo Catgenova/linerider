@@ -130,7 +130,7 @@ export const MATERIALS: Record<MaterialId, Material> = {
     frictionScale: 6,
     stickiness: 0.35,
     hotkey: '7',
-    description: 'Grabs the sled. Great for killing speed before a drop.',
+    description: 'Grabs the board. Great for killing speed before a drop.',
   }),
   conveyor: M({
     id: 'conveyor',

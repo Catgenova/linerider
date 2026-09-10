@@ -116,8 +116,8 @@ Neon Peaks, Glacier Grid (global zero friction), Dune Circuit (gusting crosswind
 
 ## Riders
 
-Bosh (classic sled), Vex (featherweight, more airtime, fragile), Tank (heavy, low friction, tough),
-Nova (snowboard model with a different point/bone rig). Riders unlock by completing specific levels.
+Bosh (the classic rig, drawn as a stick figure standing on a hoverboard), Vex (featherweight, more
+airtime, fragile), Tank (heavy, low friction, tough), Nova (a long deck with a tall standing rig). Riders unlock by completing specific levels.
 
 ## Web layout
 
