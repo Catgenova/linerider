@@ -10,8 +10,11 @@ last digit, share codes work across both, and the daily challenge is the same te
 
 ## Unity (open this folder)
 
-1. In Unity Hub choose **Add project from disk** and pick this repository folder. It was written
-   for Unity 2022.3 LTS (`ProjectSettings/ProjectVersion.txt`); any 2022.3 or newer editor works.
+1. In Unity Hub choose **Add project from disk** and pick this repository folder. It is stamped
+   for Unity 6.4 (`6000.4.0f1` in `ProjectSettings/ProjectVersion.txt`); any Unity 6 editor opens
+   it as is, and 2022.3 LTS still works after its one-time version warning. Graphics APIs are
+   pinned (DirectX 11 then 12 on Windows, Vulkan then OpenGL ES 3 on Android) so the editor never
+   asks about them.
 2. Open `Assets/Scenes/Main.unity` and press Play. The scene holds a camera and one `GameBootstrap`
    component; everything else (renderer, UI, audio, input) is created in code at runtime.
    Input works with either backend: the project ships with **Active Input Handling = Both**, so the

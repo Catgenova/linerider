@@ -90,6 +90,7 @@ namespace UnityEngine
         public static void Destroy(Object obj) { }
         public static void DontDestroyOnLoad(Object obj) { }
         public static T FindObjectOfType<T>() where T : Object => null;
+        public static T FindFirstObjectByType<T>() where T : Object => null;
         public static implicit operator bool(Object o) => o != null;
         public static bool operator ==(Object a, Object b) => ReferenceEquals(a, b);
         public static bool operator !=(Object a, Object b) => !ReferenceEquals(a, b);

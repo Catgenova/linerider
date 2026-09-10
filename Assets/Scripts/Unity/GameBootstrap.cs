@@ -26,7 +26,7 @@ namespace CyberRider.Unity
         private static void EnsureBootstrap()
         {
             if (_installed) return;
-            if (FindObjectOfType<GameBootstrap>() != null) return;
+            if (FindFirstObjectByType<GameBootstrap>() != null) return;
             var go = new GameObject("Cyber Rider");
             go.AddComponent<GameBootstrap>();
         }
