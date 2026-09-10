@@ -5,11 +5,16 @@ faithful re-implementation of the original engine (40 fps Verlet points, one-sid
 mount bones), wrapped in a campaign with ink budgets, track materials, tricks, riders, interactive
 objects, bosses, ghosts, daily challenges, a track library, an arcade mode and hotseat co-op.
 
+**Quickest way to play:** open `neon-line-rider.html` in any modern browser. It is a
+self-contained build of the whole game (no server, no install). It is a web game written in
+TypeScript on the HTML canvas, so there is nothing to open in Unity or another engine.
+
 ```
 npm install
-npm run dev        # http://localhost:5173
-npm test           # physics + level sweep
-npm run build      # static bundle in dist/
+npm run dev               # http://localhost:5173 with live reload
+npm test                  # physics + level sweep
+npm run build             # static bundle in dist/
+npm run build:standalone  # regenerate neon-line-rider.html from dist/
 ```
 
 No backend is required. Progress, records, ghosts and published tracks live in `localStorage`;
