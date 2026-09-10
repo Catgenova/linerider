@@ -1,4 +1,5 @@
-// Bundle dist/ into a single HTML file that runs when opened straight from disk.
+// Bundle dist/ into a single HTML file that runs when opened straight from disk. Extra paths on the
+// command line receive copies (the repository root index.html is what GitHub Pages serves).
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -20,6 +21,8 @@ html = html
   .replace(/<link rel="stylesheet"[^>]*href="\.\/assets\/[^"]*"[^>]*>/, () => `<style>\n${style}\n</style>`);
 
 if (html.includes('./assets/')) throw new Error('An asset reference was not inlined.');
-const out = join(process.cwd(), 'cyber-rider.html');
-writeFileSync(out, html);
-console.log(`wrote ${out} (${(html.length / 1024).toFixed(0)} KB)`);
+const outputs = [join(process.cwd(), 'cyber-rider.html'), ...process.argv.slice(2).map((p) => join(process.cwd(), p))];
+for (const out of outputs) {
+  writeFileSync(out, html);
+  console.log(`wrote ${out} (${(html.length / 1024).toFixed(0)} KB)`);
+}

@@ -61,7 +61,10 @@ a button in the HUD. The browser build behaves the same way in Android Chrome: o
 
 ## Web (`web/`)
 
-**Quickest way to play:** open `web/cyber-rider.html` in any modern browser. It is a
+**Play it online:** <https://catgenova.github.io/linerider/> (GitHub Pages, served from the
+`index.html` at the root of `main`; it also works on phones).
+
+**Quickest way to play offline:** open `web/cyber-rider.html` in any modern browser. It is a
 self-contained build of the whole game (no server, no install).
 
 ```
@@ -71,7 +74,12 @@ npm run dev               # http://localhost:5173 with live reload
 npm test                  # physics + level sweep
 npm run build             # static bundle in dist/
 npm run build:standalone  # regenerate cyber-rider.html from dist/
+npm run pages             # the same, plus the root index.html that GitHub Pages publishes
 ```
+
+After changing the web build, run `npm run pages` and commit the root `index.html`; the Pages site
+updates a minute after the push to `main`. The `.nojekyll` file at the root keeps GitHub from
+running Jekyll over the Unity project.
 
 No backend is required. Progress, records, ghosts and published tracks live in `localStorage`;
 tracks travel between players as share codes (`CYR1.…`).

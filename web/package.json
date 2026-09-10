@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build:standalone": "npm run build && node scripts/standalone.mjs"
+    "build:standalone": "npm run build && node scripts/standalone.mjs",
+    "pages": "npm run build && node scripts/standalone.mjs ../index.html"
   },
   "devDependencies": {
     "playwright": "^1.63.0",
