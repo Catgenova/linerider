@@ -111,6 +111,10 @@ export function bindInput(canvas: HTMLCanvasElement, game: Game, screens: Screen
       case 'V':
         game.setTool('flip');
         break;
+      case 'o':
+      case 'O':
+        if (game.editor.constraints.canPlaceObjects) game.setTool('object');
+        break;
       case 'g':
       case 'G':
         game.toggleGhost();

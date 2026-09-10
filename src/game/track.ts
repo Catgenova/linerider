@@ -1,6 +1,8 @@
 import type { Vec } from '../core/vec';
 import { PX_PER_METER } from '../physics/constants';
 import { MATERIALS, type MaterialId } from '../physics/materials';
+import type { EntityDef } from './entities';
+import type { PropDef } from './level';
 
 export type LineLayer = 'level' | 'player';
 
@@ -39,12 +41,24 @@ export interface LineInput {
   player?: number;
 }
 
+export interface ObjectData {
+  id: number;
+  def: EntityDef;
+}
+
+export interface PropData {
+  id: number;
+  def: PropDef;
+}
+
 export interface TrackJSON {
   version: 1;
   start: Vec;
   startVelocity?: Vec;
   finish?: Zone;
   lines: LineData[];
+  objects?: ObjectData[];
+  props?: PropData[];
   nextId: number;
 }
 
@@ -65,6 +79,10 @@ export function lineCost(l: LineData): number {
  */
 export class Track {
   readonly lines = new Map<number, LineData>();
+  /** Player-placed interactive objects (free ride / published tracks). */
+  readonly objects = new Map<number, ObjectData>();
+  /** Player-placed physics props. */
+  readonly props = new Map<number, PropData>();
   private readonly endpoints = new Map<string, Set<number>>();
   nextId = 1;
   start: Vec = { x: 0, y: 0 };
@@ -132,9 +150,49 @@ export class Track {
     this.onChange?.({ type: 'update', line, touched: [] });
   }
 
+  addObject(def: EntityDef, id?: number): ObjectData {
+    const objId = id ?? this.nextId++;
+    if (objId >= this.nextId) this.nextId = objId + 1;
+    const data = { id: objId, def: JSON.parse(JSON.stringify(def)) as EntityDef };
+    this.objects.set(objId, data);
+    this.revision++;
+    this.onChange?.({ type: 'objects', line: null, touched: [] });
+    return data;
+  }
+
+  removeObject(id: number): ObjectData | undefined {
+    const data = this.objects.get(id);
+    if (!data) return undefined;
+    this.objects.delete(id);
+    this.revision++;
+    this.onChange?.({ type: 'objects', line: null, touched: [] });
+    return data;
+  }
+
+  addProp(def: PropDef, id?: number): PropData {
+    const propId = id ?? this.nextId++;
+    if (propId >= this.nextId) this.nextId = propId + 1;
+    const data = { id: propId, def: { ...def } };
+    this.props.set(propId, data);
+    this.revision++;
+    this.onChange?.({ type: 'objects', line: null, touched: [] });
+    return data;
+  }
+
+  removeProp(id: number): PropData | undefined {
+    const data = this.props.get(id);
+    if (!data) return undefined;
+    this.props.delete(id);
+    this.revision++;
+    this.onChange?.({ type: 'objects', line: null, touched: [] });
+    return data;
+  }
+
   clear(): void {
     const ids = [...this.lines.keys()];
     for (const id of ids) this.removeLine(id);
+    for (const id of [...this.objects.keys()]) this.removeObject(id);
+    for (const id of [...this.props.keys()]) this.removeProp(id);
   }
 
   /** Metres of ink spent on player lines (optionally for one co-op player). */
@@ -190,6 +248,8 @@ export class Track {
       startVelocity: this.startVelocity ? { ...this.startVelocity } : undefined,
       finish: this.finish ? { ...this.finish } : undefined,
       lines: [...this.lines.values()].map((l) => ({ ...l })),
+      objects: [...this.objects.values()].map((o) => ({ id: o.id, def: JSON.parse(JSON.stringify(o.def)) })),
+      props: [...this.props.values()].map((o) => ({ id: o.id, def: { ...o.def } })),
       nextId: this.nextId,
     };
   }
@@ -200,6 +260,8 @@ export class Track {
     t.startVelocity = json.startVelocity ? { ...json.startVelocity } : undefined;
     t.finish = json.finish ? { ...json.finish } : undefined;
     for (const l of json.lines) t.addLine(l, l.id);
+    for (const o of json.objects ?? []) t.addObject(o.def, o.id);
+    for (const o of json.props ?? []) t.addProp(o.def, o.id);
     t.nextId = Math.max(t.nextId, json.nextId ?? 1);
     return t;
   }
@@ -259,8 +321,8 @@ export class Track {
 }
 
 export interface TrackChange {
-  type: 'add' | 'remove' | 'update';
-  line: LineData;
+  type: 'add' | 'remove' | 'update' | 'objects';
+  line: LineData | null;
   /** Ids of other lines whose extension flags changed. */
   touched: number[];
 }

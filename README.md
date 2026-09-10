@@ -23,7 +23,7 @@ tracks travel between players as share codes (`NLR1.…`).
 | Backspace | Stop and rewind |
 | R / Shift+R | Restart keeping lines / restart and wipe your lines |
 | F / Shift+F | Set a flag at the current moment / clear it |
-| P L E H V | Pencil, straight line, eraser, pan, flip tool |
+| P L E H V O | Pencil, straight line, eraser, pan, flip, object placement (free ride) |
 | 1-9 0 - = | Select a material (see palette) |
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 | Scroll, middle-drag | Zoom, pan |
@@ -42,7 +42,8 @@ Lines are one-sided, exactly like the original: draw left to right and the top f
   Level types: reach, puzzle (tiny budgets), stunt, flags, delivery (fragile cargo), rescue
   (pick up stranded techs), destruction (chaos score), boss (avalanche, rockslide, collapsing
   clock tower, rolling moonball, the machine core).
-- **Free Ride** – unlimited ink in any environment, place your own start and finish, publish.
+- **Free Ride** – unlimited ink in any environment, place your own start and finish, drop in
+  physics toys and props from the object palette (O), and publish the result.
 - **Neon Rush** – draw-while-riding arcade: the rider never stops, terrain generates ahead, ink
   regenerates with distance, a tailwind keeps raising the pace. Score is distance.
 - **Daily Challenge** – seeded from the UTC date; everyone gets the same terrain, flags, finish and
@@ -65,7 +66,9 @@ different amount of ink per metre.
 
 Moving platforms, gears, pendulums, fans, magnets, cannons, breakable walls, balloons, seesaws,
 trains, rockfalls, collapsing bridges, timed collapses, an avalanche wall, a chasing snowball, and
-Verlet props (dominoes, crates, TNT with chain reactions, boulders, fragile cargo).
+Verlet props (dominoes, crates, carts, TNT with chain reactions, boulders, fragile cargo). Levels
+define them in data; in Free Ride the player places them from a palette, sees them animate while
+editing, erases them with the eraser, and they travel with published tracks and share codes.
 
 ## Environments
 

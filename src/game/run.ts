@@ -73,16 +73,14 @@ export class Run {
       line.player = l.player;
     }
     const level = opts.level;
-    if (level) {
-      for (const def of level.entities ?? []) {
-        const e = buildEntity(def, world);
-        if (e) world.addEntity(e);
-      }
-      for (const pd of level.props ?? []) {
-        world.addProp(new Prop({ ...pd, id: world.nextDynamicId++ }));
-      }
-      world.settleProps(200);
+    const entityDefs = [...(level?.entities ?? []), ...[...opts.track.objects.values()].map((o) => o.def)];
+    const propDefs = [...(level?.props ?? []), ...[...opts.track.props.values()].map((o) => o.def)];
+    for (const def of entityDefs) {
+      const e = buildEntity(def, world);
+      if (e) world.addEntity(e);
     }
+    for (const pd of propDefs) world.addProp(new Prop({ ...pd, id: world.nextDynamicId++ }));
+    if (propDefs.length) world.settleProps(200);
     const start = opts.track.start;
     const rd = opts.riderDef;
     const vel = opts.track.startVelocity ?? { x: rd.startVelocity, y: 0 };
@@ -111,6 +109,7 @@ export class Run {
   /** Keep the world in sync with live edits (draw-while-riding). */
   private applyChange(c: TrackChange): void {
     const world = this.world;
+    if (c.type === 'objects' || !c.line) return;
     if (c.type === 'remove') world.removeLine(c.line.id);
     else if (c.type === 'add') {
       const line = world.addLine(c.line);

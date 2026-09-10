@@ -27,6 +27,8 @@ export interface Scene {
   camera: Camera;
   track: Track;
   world: World | null;
+  /** Objects shown while editing, when there is no live world. */
+  previewWorld: World | null;
   ghostWorld: World | null;
   environment: Environment;
   editor: Editor | null;
@@ -112,8 +114,24 @@ export class Renderer {
       this.drawEntityLines(scene.world, cam.zoom, pulse);
       for (const prop of scene.world.props) this.drawProp(prop, scene, pulse);
     }
+    if (!scene.world && scene.previewWorld) {
+      const pw = scene.previewWorld;
+      for (const e of pw.entities) if (e.active && e.render) e.render(ctx, scene.time, pulse);
+      this.drawEntityLines(pw, cam.zoom, pulse);
+      for (const prop of pw.props) this.drawProp(prop, scene, pulse);
+    }
     if (scene.ghostWorld) {
-      for (const rider of scene.ghostWorld.riders) this.drawRider(rider, { color: '#ffffff', glow: '#c8c8ff' }, cam.zoom, 0.32, false);
+      for (const rider of scene.ghostWorld.riders) {
+        this.drawRider(rider, { color: '#e0c8ff', glow: '#b48cff' }, cam.zoom, 0.38, false);
+        const c = rider.center();
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = '#e0c8ff';
+        ctx.font = `700 ${4 / Math.min(1, cam.zoom / 2)}px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('GHOST', c.x + 6, c.y - 14);
+        ctx.restore();
+      }
     }
     if (scene.world) {
       scene.world.riders.forEach((rider, i) => {

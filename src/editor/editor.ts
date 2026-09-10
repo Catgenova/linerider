@@ -1,10 +1,11 @@
 import { distToSegment, type Vec } from '../core/vec';
 import { PX_PER_METER } from '../physics/constants';
 import { MATERIALS, type MaterialId } from '../physics/materials';
-import type { LineData, Track } from '../game/track';
+import type { LineData, ObjectData, PropData, Track } from '../game/track';
+import { entityAnchor, objectKind, type ObjectKind } from '../game/objectKinds';
 import type { Camera } from './camera';
 
-export type ToolId = 'pencil' | 'line' | 'eraser' | 'pan' | 'flip';
+export type ToolId = 'pencil' | 'line' | 'eraser' | 'pan' | 'flip' | 'object';
 
 export interface EditorConstraints {
   /** Ink budget in metres, or null for unlimited. */
@@ -17,11 +18,17 @@ export interface EditorConstraints {
   player: number;
   /** Disables all editing. */
   locked: boolean;
+  /** Whether interactive objects and props may be placed. */
+  canPlaceObjects: boolean;
 }
 
 interface Command {
   added: LineData[];
   removed: LineData[];
+  addedObjects?: ObjectData[];
+  removedObjects?: ObjectData[];
+  addedProps?: PropData[];
+  removedProps?: PropData[];
 }
 
 export interface EditorEvents {
@@ -33,12 +40,14 @@ export interface EditorEvents {
 export class Editor {
   tool: ToolId = 'pencil';
   material: MaterialId = 'normal';
+  objectKind: ObjectKind = 'spring';
   constraints: EditorConstraints = {
     budget: null,
     materials: ['normal', 'accel', 'scenery'],
     canEraseLevel: false,
     player: 0,
     locked: false,
+    canPlaceObjects: false,
   };
   events: EditorEvents = {};
   /** Straight-line preview (world coords) while dragging. */
@@ -129,10 +138,33 @@ export class Editor {
         if (id >= 0) this.flip(id);
         break;
       }
+      case 'object':
+        this.placeObject(w.x, w.y);
+        break;
       default:
         break;
     }
     void shift;
+  }
+
+  /** Drop the selected object kind at a world position. */
+  placeObject(x: number, y: number): boolean {
+    if (!this.constraints.canPlaceObjects || this.constraints.locked) return false;
+    const kind = objectKind(this.objectKind);
+    const placement = kind.make(Math.round(x), Math.round(y));
+    const cmd: Command = { added: [], removed: [], addedObjects: [], addedProps: [] };
+    if (placement.lines) {
+      for (const l of placement.lines) {
+        const line = this.track.addLine({ ...l, layer: 'player', player: this.constraints.player });
+        cmd.added.push({ ...line });
+      }
+    }
+    if (placement.entity) cmd.addedObjects!.push(this.track.addObject(placement.entity));
+    if (placement.prop) cmd.addedProps!.push(this.track.addProp(placement.prop));
+    this.undoStack.push(cmd);
+    this.redoStack.length = 0;
+    this.events.onEdit?.();
+    return true;
   }
 
   pointerMove(sx: number, sy: number, shift: boolean): void {
@@ -291,7 +323,26 @@ export class Editor {
       this.track.removeLine(l.id);
       this.current?.removed.push({ ...l });
     }
-    if (hits.length) this.events.onEdit?.();
+    let hitObjects = 0;
+    if (this.constraints.canPlaceObjects) {
+      const rr = Math.max(r, 14 / this.camera.zoom);
+      for (const o of [...this.track.objects.values()]) {
+        const a = entityAnchor(o.def);
+        if (Math.hypot(a.x - x, a.y - y) <= rr) {
+          this.track.removeObject(o.id);
+          if (this.current) (this.current.removedObjects ??= []).push(o);
+          hitObjects++;
+        }
+      }
+      for (const o of [...this.track.props.values()]) {
+        if (Math.hypot(o.def.x - x, o.def.y - y) <= rr) {
+          this.track.removeProp(o.id);
+          if (this.current) (this.current.removedProps ??= []).push(o);
+          hitObjects++;
+        }
+      }
+    }
+    if (hits.length || hitObjects) this.events.onEdit?.();
   }
 
   private flip(id: number): void {
@@ -316,8 +367,9 @@ export class Editor {
   }
 
   private commit(): void {
-    if (this.current && (this.current.added.length || this.current.removed.length)) {
-      this.undoStack.push(this.current);
+    const c = this.current;
+    if (c && (c.added.length || c.removed.length || c.removedObjects?.length || c.removedProps?.length)) {
+      this.undoStack.push(c);
       if (this.undoStack.length > 200) this.undoStack.shift();
       this.redoStack.length = 0;
     }
@@ -329,6 +381,10 @@ export class Editor {
     if (!cmd) return;
     for (const l of cmd.added) this.track.removeLine(l.id);
     for (const l of cmd.removed) this.track.addLine(l, l.id);
+    for (const o of cmd.addedObjects ?? []) this.track.removeObject(o.id);
+    for (const o of cmd.removedObjects ?? []) this.track.addObject(o.def, o.id);
+    for (const o of cmd.addedProps ?? []) this.track.removeProp(o.id);
+    for (const o of cmd.removedProps ?? []) this.track.addProp(o.def, o.id);
     this.redoStack.push(cmd);
     this.events.onEdit?.();
   }
@@ -338,6 +394,10 @@ export class Editor {
     if (!cmd) return;
     for (const l of cmd.removed) this.track.removeLine(l.id);
     for (const l of cmd.added) this.track.addLine(l, l.id);
+    for (const o of cmd.removedObjects ?? []) this.track.removeObject(o.id);
+    for (const o of cmd.addedObjects ?? []) this.track.addObject(o.def, o.id);
+    for (const o of cmd.removedProps ?? []) this.track.removeProp(o.id);
+    for (const o of cmd.addedProps ?? []) this.track.addProp(o.def, o.id);
     this.undoStack.push(cmd);
     this.events.onEdit?.();
   }
@@ -348,16 +408,26 @@ export class Editor {
     this.current = null;
   }
 
-  /** Remove every player-drawn line (used by "clear my track"). */
+  /** Remove every player-drawn line and placed object (used by "clear my track"). */
   clearPlayerLines(): void {
-    const cmd: Command = { added: [], removed: [] };
+    const cmd: Command = { added: [], removed: [], removedObjects: [], removedProps: [] };
     for (const l of [...this.track.lines.values()]) {
       if (l.layer !== 'player') continue;
       if (this.constraints.player && l.player !== this.constraints.player) continue;
       this.track.removeLine(l.id);
       cmd.removed.push({ ...l });
     }
-    if (cmd.removed.length) {
+    if (this.constraints.canPlaceObjects) {
+      for (const o of [...this.track.objects.values()]) {
+        this.track.removeObject(o.id);
+        cmd.removedObjects!.push(o);
+      }
+      for (const o of [...this.track.props.values()]) {
+        this.track.removeProp(o.id);
+        cmd.removedProps!.push(o);
+      }
+    }
+    if (cmd.removed.length || cmd.removedObjects!.length || cmd.removedProps!.length) {
       this.undoStack.push(cmd);
       this.redoStack.length = 0;
       this.events.onEdit?.();

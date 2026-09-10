@@ -257,6 +257,7 @@ export class Screens {
     const stats = el('div', { class: 'stat-grid' }, [
       this.stat('TIME', s.finished ? fmtTime(s.frames) : '--'),
       this.stat('INK USED', `${s.inkUsed.toFixed(1)} m`),
+      info.level ? this.stat('INK LEFT', `${Math.max(0, info.level.budget - s.inkUsed).toFixed(1)} m`) : null,
       this.stat('TRICKS', `${s.trickScore}`),
       this.stat('AIRTIME', `${(s.airtimeFrames / 40).toFixed(1)}s`),
       info.mode === 'arcade' ? this.stat('DISTANCE', `${s.distance.toFixed(0)} m`) : this.stat('FLIPS', `${s.flips}`),

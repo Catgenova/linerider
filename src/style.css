@@ -82,6 +82,9 @@ button { font-family: inherit; color: inherit; }
 .playbar .sep { width: 8px; height: auto; }
 
 .palette { position: absolute; left: 14px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 4px; max-width: 460px; }
+.palette.objects { bottom: 88px; max-width: 560px; }
+.btn.mat.obj .icon { font-size: 12px; width: 14px; text-align: center; }
+.btn.mat.obj.active { border-color: var(--yellow); box-shadow: 0 0 14px var(--yellow); }
 .btn.mat { display: flex; align-items: center; gap: 6px; padding: 5px 8px; --mat: #fff; }
 .btn.mat .swatch { width: 10px; height: 10px; border-radius: 2px; background: var(--mat); box-shadow: 0 0 8px var(--mat); }
 .btn.mat .label { font-size: 10px; }

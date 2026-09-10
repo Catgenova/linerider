@@ -2,6 +2,7 @@ import type { ToolId } from '../editor/editor';
 import type { Game } from '../game/game';
 import { objectiveLabel, evaluateObjective, type Objective } from '../game/level';
 import { MATERIALS, type MaterialId } from '../physics/materials';
+import { OBJECT_KINDS } from '../game/objectKinds';
 import { $, clear, el, fmtTime } from './dom';
 
 const TOOLS: { id: ToolId; label: string; key: string; icon: string }[] = [
@@ -10,6 +11,7 @@ const TOOLS: { id: ToolId; label: string; key: string; icon: string }[] = [
   { id: 'eraser', label: 'Eraser', key: 'E', icon: '⌫' },
   { id: 'flip', label: 'Flip side', key: 'V', icon: '⇅' },
   { id: 'pan', label: 'Pan', key: 'H', icon: '✥' },
+  { id: 'object', label: 'Objects', key: 'O', icon: '⚙' },
 ];
 
 /** In-game overlay: ink meter, timer, objectives, tools, materials, playback. */
@@ -17,6 +19,7 @@ export class Hud {
   private root = $('hud');
   private toolbar = el('div', { class: 'toolbar' });
   private palette = el('div', { class: 'palette' });
+  private objectPalette = el('div', { class: 'palette objects' });
   private playbar = el('div', { class: 'playbar' });
   private objectives = el('div', { class: 'objectives' });
   private message = el('div', { class: 'hud-message' });
@@ -43,7 +46,7 @@ export class Hud {
       el('div', { class: 'hud-right' }, [this.stats]),
     ]);
     this.inkBox2.append(el('div', { class: 'ink-bar' }, [this.inkFill2]), this.inkText2);
-    this.root.append(top, this.objectives, this.toolbar, this.palette, this.playbar, this.message, this.hint);
+    this.root.append(top, this.objectives, this.toolbar, this.objectPalette, this.palette, this.playbar, this.message, this.hint);
     this.rebuild();
   }
 
@@ -53,6 +56,7 @@ export class Hud {
     const editor = game.editor;
     clear(this.toolbar);
     for (const t of TOOLS) {
+      if (t.id === 'object' && !editor.constraints.canPlaceObjects) continue;
       this.toolbar.append(
         el('button', {
           class: `btn tool${editor.tool === t.id ? ' active' : ''}`,
@@ -91,6 +95,18 @@ export class Hud {
       );
     }
 
+    clear(this.objectPalette);
+    if (editor.constraints.canPlaceObjects && editor.tool === 'object') {
+      for (const k of OBJECT_KINDS) {
+        this.objectPalette.append(
+          el('button', {
+            class: `btn mat obj${editor.objectKind === k.id ? ' active' : ''}`,
+            title: `${k.name}: ${k.description} Click on the track to place; the eraser removes it.`,
+            onClick: () => game.setObjectKind(k.id),
+          }, [el('span', { class: 'icon', text: k.icon }), el('span', { class: 'label', text: k.name })]),
+        );
+      }
+    }
     clear(this.palette);
     for (const id of editor.constraints.materials) {
       const m = MATERIALS[id as MaterialId];

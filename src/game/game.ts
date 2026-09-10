@@ -15,6 +15,10 @@ import { Progress } from './progress';
 import { RIDERS, type RiderDef, type RiderId } from './riders';
 import { Run } from './run';
 import { Track } from './track';
+import { buildEntity } from './entities';
+import { Prop } from '../physics/prop';
+import { World } from '../physics/world';
+import type { ObjectKind } from './objectKinds';
 import { ArcadeDirector } from '../modes/arcade';
 import { generateDaily, dailySeedFor, todayKey } from '../modes/daily';
 import { BUILTIN_TRACKS } from '../modes/builtin';
@@ -73,6 +77,9 @@ export class Game {
   private resultsTimer = 0;
   private readonly markers: Marker[] = [];
   private finishPlacement: 'none' | 'start' | 'finish' = 'none';
+  /** Animated stand-in for placed objects while editing (no rider). */
+  private previewWorld: World | null = null;
+  private previewRevision = -1;
 
   constructor(public readonly canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas);
@@ -97,6 +104,42 @@ export class Game {
       onInkExhausted: () => this.callbacks.onMessage('OUT OF INK', '#ff3d7f'),
       onEdit: () => this.callbacks.onStateChange(),
     };
+    this.track.onChange = null;
+    this.previewRevision = -1;
+  }
+
+  /** Objects cannot be hot-swapped into a running world, so placing one rewinds the run. */
+  private watchObjectChanges(): void {
+    const track = this.track;
+    const prev = track.onChange;
+    track.onChange = (c) => {
+      prev?.(c);
+      if (c.type === 'objects' && this.run) this.stop();
+    };
+  }
+
+  private refreshPreview(): void {
+    const track = this.track;
+    if (this.previewRevision === track.revision && this.previewWorld) return;
+    this.previewRevision = track.revision;
+    if (track.objects.size === 0 && track.props.size === 0) {
+      this.previewWorld = null;
+      return;
+    }
+    const world = new World();
+    for (const o of track.objects.values()) {
+      const e = buildEntity(o.def, world);
+      if (e) world.addEntity(e);
+    }
+    for (const o of track.props.values()) world.addProp(new Prop({ ...o.def, id: world.nextDynamicId++ }));
+    this.previewWorld = world;
+  }
+
+  setObjectKind(kind: ObjectKind): void {
+    this.editor.objectKind = kind;
+    this.editor.tool = 'object';
+    this.finishPlacement = 'none';
+    this.callbacks.onStateChange();
   }
 
   // ---------------------------------------------------------------- mode setup
@@ -129,6 +172,7 @@ export class Game {
       canEraseLevel: false,
       player: coop ? 1 : 0,
       locked: false,
+      canPlaceObjects: false,
     };
     if (coop) {
       this.coop = { active: true, player: 1, budgets: [level.budget * 0.6, level.budget * 0.6] };
@@ -147,7 +191,7 @@ export class Game {
     const level = this.level;
     if (!level) return;
     const focus = level.focus ?? level.start;
-    const maxCx = level.start.x + (this.camera.width / 2 - 170) / this.camera.zoom;
+    const maxCx = level.start.x + (this.camera.width / 2 - 290) / this.camera.zoom;
     this.camera.snapTo(Math.min(focus.x, maxCx), focus.y);
   }
 
@@ -170,7 +214,7 @@ export class Game {
     this.level = null;
     this.mode = 'free';
     this.environment = ENVIRONMENTS[environment];
-    this.editor.constraints = { budget: null, materials: [...MATERIAL_ORDER], canEraseLevel: true, player: 0, locked: false };
+    this.editor.constraints = { budget: null, materials: [...MATERIAL_ORDER], canEraseLevel: true, player: 0, locked: false, canPlaceObjects: true };
     this.camera.zoom = 2.5;
     this.camera.snapTo(60, 20);
     this.callbacks.onStateChange();
@@ -183,7 +227,7 @@ export class Game {
     this.track.finish = { x: 700, y: 120, w: 40, h: 70 };
     this.track.addLine({ x1: -30, y1: 10, x2: 60, y2: 20, layer: 'level' });
     this.track.addLine({ x1: 700, y1: 190, x2: 760, y2: 190, layer: 'level' });
-    this.editor.constraints = { budget, materials: [...MATERIAL_ORDER], canEraseLevel: false, player: 1, locked: false };
+    this.editor.constraints = { budget, materials: [...MATERIAL_ORDER], canEraseLevel: false, player: 1, locked: false, canPlaceObjects: false };
     this.callbacks.onStateChange();
   }
 
@@ -195,7 +239,7 @@ export class Game {
     this.mode = 'arcade';
     this.environment = ENVIRONMENTS.rooftops;
     this.arcade = new ArcadeDirector(track, new Rng(Date.now() >>> 0));
-    this.editor.constraints = { budget: this.arcade.budget, materials: ['normal', 'accel', 'spring'], canEraseLevel: false, player: 0, locked: false };
+    this.editor.constraints = { budget: this.arcade.budget, materials: ['normal', 'accel', 'spring'], canEraseLevel: false, player: 0, locked: false, canPlaceObjects: false };
     this.editor.tool = 'pencil';
     this.camera.zoom = 2;
     this.camera.snapTo(120, 0);
@@ -226,6 +270,7 @@ export class Game {
       canEraseLevel: pub.budget === null,
       player: 0,
       locked: false,
+      canPlaceObjects: pub.budget === null,
     };
     // Published lines count as level geometry when there's a budget (a puzzle), else all editable.
     for (const l of track.lines.values()) l.layer = pub.budget === null ? 'player' : 'level';
@@ -271,6 +316,7 @@ export class Game {
       skipFrames,
       endless: this.mode === 'arcade',
     });
+    this.watchObjectChanges();
     if (this.ghostRun) {
       const g = this.ghostRun;
       this.ghostRun = new Run({ track: g.track, level: this.level, riderDef: g.riderDef, environment: this.environment, skipFrames });
@@ -403,6 +449,14 @@ export class Game {
         steps++;
       }
       if (steps === 12) this.accumulator = 0;
+    }
+    if (!this.run) {
+      this.refreshPreview();
+      const pw = this.previewWorld;
+      if (pw) {
+        pw.frame++;
+        for (const e of pw.entities) if (e.active) e.update(pw);
+      }
     }
     this.audio.riding = this.playState === 'play' && !!this.run && !this.run.done;
     this.effects.update((dt * 1000 * (this.playState === 'play' ? this.speed : 1)) / FRAME_MS);
@@ -606,6 +660,7 @@ export class Game {
       camera: this.camera,
       track: this.track,
       world: this.run?.world ?? null,
+      previewWorld: this.run ? null : this.previewWorld,
       ghostWorld: this.ghostEnabled && this.ghostRun && this.playState !== 'edit' ? this.ghostRun.world : null,
       environment: this.environment,
       editor: this.editor,
