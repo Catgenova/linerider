@@ -124,5 +124,6 @@ web/src/ui         HUD, menu screens, input (mouse, touch, keyboard)
 web/tests          physics behaviour and a sweep over every campaign level
 ```
 
-An earlier Unity 2D port of the same game is kept in git history at the `unity-port` tag. It is
+An earlier Unity 2D port of the same game is kept in git history; commit `ceaa04e` is the last one
+that carries it (`git checkout ceaa04e -- Assets Packages ProjectSettings tools` restores it). It is
 not maintained; the browser build is the game.
