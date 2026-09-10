@@ -521,3 +521,63 @@ namespace UnityEngine
         public class GraphicRaycaster : MonoBehaviour { }
     }
 }
+
+// ---------------------------------------------------------------- Input System package (com.unity.inputsystem)
+
+namespace UnityEngine.InputSystem
+{
+    public enum Key
+    {
+        None, Space, Enter, Tab, Backquote, Quote, Semicolon, Comma, Period, Slash, Backslash, LeftBracket, RightBracket, Minus, Equals,
+        A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+        Digit1, Digit2, Digit3, Digit4, Digit5, Digit6, Digit7, Digit8, Digit9, Digit0,
+        LeftShift, RightShift, LeftAlt, RightAlt, LeftCtrl, RightCtrl, LeftMeta, RightMeta, ContextMenu,
+        Escape, LeftArrow, RightArrow, UpArrow, DownArrow, Backspace, PageDown, PageUp, Home, End, Insert, Delete, CapsLock, NumLock, PrintScreen, ScrollLock, Pause,
+    }
+
+    public class Keyboard
+    {
+        public static Keyboard current { get; }
+        public Controls.KeyControl this[Key key] => null;
+    }
+
+    public class Mouse
+    {
+        public static Mouse current { get; }
+        public Controls.Vector2Control position { get; }
+        public Controls.DeltaControl scroll { get; }
+        public Controls.ButtonControl leftButton { get; }
+        public Controls.ButtonControl rightButton { get; }
+        public Controls.ButtonControl middleButton { get; }
+    }
+
+    namespace Controls
+    {
+        public class ButtonControl
+        {
+            public bool isPressed { get; }
+            public bool wasPressedThisFrame { get; }
+            public bool wasReleasedThisFrame { get; }
+        }
+
+        public class KeyControl : ButtonControl
+        {
+        }
+
+        public class Vector2Control
+        {
+            public Vector2 ReadValue() => default;
+        }
+
+        public class DeltaControl : Vector2Control
+        {
+        }
+    }
+
+    namespace UI
+    {
+        public class InputSystemUIInputModule : MonoBehaviour
+        {
+        }
+    }
+}

@@ -6,13 +6,13 @@ import { MATERIAL_ORDER, type MaterialId } from '../physics/materials';
 import { Effects } from '../render/effects';
 import { GameAudio } from './audio';
 import { Renderer, type Marker, type Scene } from '../render/renderer';
-import { ENVIRONMENTS, type Environment, type EnvironmentId } from './environments';
+import { ENVIRONMENTS, ENVIRONMENT_ORDER, type Environment, type EnvironmentId } from './environments';
 import { evaluateLevel, type LevelDef, type Medal, type ObjectiveResult, type RunSummary } from './level';
 import { LEVELS, REGIONS, levelById, nextLevel } from './levels';
 import { trackFromLevel } from './loadLevel';
 import { LocalTrackStore, type PublishedTrack } from './library';
 import { Progress } from './progress';
-import { RIDERS, type RiderDef, type RiderId } from './riders';
+import { RIDERS, RIDER_ORDER, type RiderDef, type RiderId } from './riders';
 import { Run } from './run';
 import { Track } from './track';
 import { buildEntity } from './entities';
@@ -20,10 +20,11 @@ import { Prop } from '../physics/prop';
 import { World } from '../physics/world';
 import type { ObjectKind } from './objectKinds';
 import { ArcadeDirector } from '../modes/arcade';
+import { AttractDirector } from '../modes/attract';
 import { generateDaily, dailySeedFor, todayKey } from '../modes/daily';
 import { BUILTIN_TRACKS } from '../modes/builtin';
 
-export type GameMode = 'campaign' | 'free' | 'arcade' | 'daily' | 'coop' | 'library';
+export type GameMode = 'campaign' | 'free' | 'arcade' | 'daily' | 'coop' | 'library' | 'attract';
 export type PlayState = 'edit' | 'play' | 'pause';
 
 export interface ResultsInfo {
@@ -68,6 +69,8 @@ export class Game {
   following = true;
   coop = { active: false, player: 1 as 1 | 2, budgets: [100, 100] as [number, number] };
   arcade: ArcadeDirector | null = null;
+  attract: AttractDirector | null = null;
+  private attractIndex = 0;
   dailyKey: string | null = null;
   libraryTrack: PublishedTrack | null = null;
   callbacks: GameCallbacks = { onResults: () => {}, onStateChange: () => {}, onMessage: () => {} };
@@ -146,6 +149,12 @@ export class Game {
 
   private resetTrack(track: Track): void {
     this.stop();
+    if (this.mode === 'attract') {
+      // The demo borrows riders; give the player theirs back.
+      const saved = this.progress.data.settings.rider as RiderId;
+      if (RIDERS[saved]) this.riderDef = RIDERS[saved];
+    }
+    this.attract = null;
     this.track = track;
     this.editor = new Editor(track, this.camera);
     this.bindEditorEvents();
@@ -244,6 +253,26 @@ export class Game {
     this.camera.zoom = 2;
     this.camera.snapTo(120, 0);
     this.play();
+    this.callbacks.onStateChange();
+  }
+
+  /** Menu backdrop: an endless demo ride that cycles environments and riders. */
+  startAttract(): void {
+    const idx = this.attractIndex++;
+    const track = new Track();
+    this.resetTrack(track);
+    this.level = null;
+    this.mode = 'attract';
+    this.environment = ENVIRONMENTS[ENVIRONMENT_ORDER[idx % ENVIRONMENT_ORDER.length]];
+    this.riderDef = RIDERS[RIDER_ORDER[idx % RIDER_ORDER.length]];
+    this.attract = new AttractDirector(track, new Rng((Date.now() + idx * 7919) >>> 0));
+    this.editor.constraints = { budget: null, materials: ['normal'], canEraseLevel: false, player: 0, locked: true, canPlaceObjects: false };
+    this.camera.zoom = 2.3;
+    this.camera.snapTo(120, 30);
+    this.effects.clear();
+    this.play();
+    this.effects.flash = 0.25;
+    this.effects.flashColor = this.environment.visuals.accent;
     this.callbacks.onStateChange();
   }
 
@@ -364,6 +393,10 @@ export class Game {
       this.startArcade();
       return;
     }
+    if (this.mode === 'attract') {
+      this.startAttract();
+      return;
+    }
     this.play();
   }
 
@@ -458,7 +491,7 @@ export class Game {
         for (const e of pw.entities) if (e.active) e.update(pw);
       }
     }
-    this.audio.riding = this.playState === 'play' && !!this.run && !this.run.done;
+    this.audio.riding = this.playState === 'play' && !!this.run && !this.run.done && this.mode !== 'attract';
     this.effects.update((dt * 1000 * (this.playState === 'play' ? this.speed : 1)) / FRAME_MS);
     this.updateCamera(dt);
     this.camera.update(dt);
@@ -467,6 +500,19 @@ export class Game {
 
   private simStep(): void {
     const run = this.run!;
+    if (this.attract) {
+      // Demo rides never show results: crash, fall or time out and the next ride begins.
+      const crashed = run.rider.deathFrame >= 0 && run.frame - run.rider.deathFrame > 70;
+      if (run.done || crashed || run.frame > 40 * 50) {
+        this.startAttract();
+        return;
+      }
+      run.step();
+      this.attract.update(run);
+      this.consumeRunEvents(run);
+      this.spawnContactSparks(run);
+      return;
+    }
     if (run.done) {
       // Let the crash play out a little before results.
       if (!this.resultsPending) return;
@@ -566,7 +612,7 @@ export class Game {
       const rider = this.run.rider;
       const c = rider.center();
       const v = rider.velocity();
-      const lead = this.mode === 'arcade' ? 90 / this.camera.zoom : 12;
+      const lead = this.mode === 'arcade' ? 90 / this.camera.zoom : this.mode === 'attract' ? 110 / this.camera.zoom : 12;
       this.camera.follow(c.x + v.x * 6 + lead, c.y + v.y * 3);
     }
   }
@@ -672,7 +718,7 @@ export class Game {
       markers,
       focusRider: 0,
       focusPoint: this.editor.cursorWorld,
-      showEditorOverlay: true,
+      showEditorOverlay: this.mode !== 'attract',
     };
   }
 

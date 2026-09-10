@@ -103,6 +103,8 @@ button { font-family: inherit; color: inherit; }
 /* ---------------------------------------------------------------- overlay */
 #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 30%, rgba(60, 20, 120, 0.55), rgba(3, 1, 10, 0.92)); overflow: auto; padding: 24px; }
 #overlay.show { display: flex; }
+#overlay.attract { background: radial-gradient(circle at 50% 30%, rgba(60, 20, 120, 0.28), rgba(3, 1, 10, 0.62)); }
+#overlay.attract .panel { background: rgba(8, 4, 28, 0.78); }
 .panel { background: var(--panel); border: 1px solid var(--panel-border); box-shadow: 0 0 40px rgba(57, 246, 255, 0.15), inset 0 0 60px rgba(255, 43, 214, 0.05); border-radius: 8px; padding: 24px 28px; max-height: calc(100vh - 48px); overflow: auto; position: relative; }
 .panel.narrow { width: min(640px, 100%); }
 .panel.wide { width: min(1100px, 100%); }

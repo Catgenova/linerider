@@ -98,7 +98,7 @@ namespace CyberRider.Unity
             }
             else DrawStartMarker(game, pulse);
             DrawEffects(fx, cam.Zoom);
-            DrawEditorOverlay(game, pulse);
+            if (game.Mode != GameMode.Attract) DrawEditorOverlay(game, pulse);
             _dynGlow.Apply();
             _dynCore.Apply();
 

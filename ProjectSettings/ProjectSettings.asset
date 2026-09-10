@@ -11,3 +11,4 @@ PlayerSettings:
   defaultScreenHeight: 760
   runInBackground: 1
   fullscreenMode: 3
+  activeInputHandler: 2

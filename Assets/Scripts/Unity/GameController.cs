@@ -14,6 +14,8 @@ namespace CyberRider.Unity
         Daily,
         Coop,
         Library,
+        /// <summary>Main-menu demo ride: no results, no editing, restarts by itself.</summary>
+        Attract,
     }
 
     public enum PlayState
@@ -80,6 +82,8 @@ namespace CyberRider.Unity
         public int CoopPlayer = 1;
         public readonly double[] CoopBudgets = { 100, 100 };
         public ArcadeDirector Arcade;
+        public AttractDirector Attract;
+        private int _attractIndex;
         public string DailyKey;
         public PublishedTrack LibraryTrack;
         public IGameAudio Audio;
@@ -119,6 +123,12 @@ namespace CyberRider.Unity
         private void ResetTrack(Track track)
         {
             Stop();
+            if (Mode == GameMode.Attract)
+            {
+                // The demo borrows riders; give the player theirs back.
+                RiderDef = Riders.Get(Progress.RiderSetting);
+            }
+            Attract = null;
             Track = track;
             Editor = new TrackEditor(track);
             BindEditorEvents();
@@ -240,6 +250,28 @@ namespace CyberRider.Unity
             Editor.Zoom = Camera.Zoom;
             Camera.SnapTo(120, 0);
             Play();
+            OnStateChange?.Invoke();
+        }
+
+        /// <summary>Start (or advance) the menu demo: a rolling ride behind the title screen.</summary>
+        public void StartAttract()
+        {
+            int idx = _attractIndex++;
+            var track = new Track();
+            ResetTrack(track);
+            Level = null;
+            Mode = GameMode.Attract;
+            Environment = Environments.All[idx % Environments.All.Length];
+            RiderDef = Riders.All[idx % Riders.All.Length];
+            Attract = new AttractDirector(track, new Rng(unchecked((uint)(DateTime.UtcNow.Ticks + idx * 7919))));
+            Editor.Constraints = new EditorConstraints { Budget = null, Materials = new List<MaterialId> { MaterialId.Normal }, CanEraseLevel = false, Player = 0, Locked = true, CanPlaceObjects = false };
+            Camera.Zoom = 2.3;
+            Editor.Zoom = Camera.Zoom;
+            Camera.SnapTo(120, 30);
+            Effects.Clear();
+            Play();
+            Effects.Flash = 0.25;
+            Effects.FlashColor = Environment.Accent;
             OnStateChange?.Invoke();
         }
 
@@ -370,6 +402,11 @@ namespace CyberRider.Unity
                 StartArcade();
                 return;
             }
+            if (Mode == GameMode.Attract)
+            {
+                StartAttract();
+                return;
+            }
             Play();
         }
 
@@ -496,7 +533,7 @@ namespace CyberRider.Unity
                     foreach (Entity e in pw.Entities) if (e.Active) e.Update(pw);
                 }
             }
-            if (Audio != null) Audio.Riding = PlayState == PlayState.Play && Run != null && !Run.Done;
+            if (Audio != null) Audio.Riding = PlayState == PlayState.Play && Run != null && !Run.Done && Mode != GameMode.Attract;
             Effects.Update(dt * 1000 * (PlayState == PlayState.Play ? Speed : 1) / Constants.FrameMs);
             UpdateCamera();
             Camera.Update(dt);
@@ -525,6 +562,21 @@ namespace CyberRider.Unity
         private void SimStep()
         {
             Run run = Run;
+            if (Attract != null)
+            {
+                // Demo rides never show results: crash, fall or time out and the next ride begins.
+                bool crashed = run.Rider.DeathFrame >= 0 && run.Frame - run.Rider.DeathFrame > 70;
+                if (run.Done || crashed || run.Frame > 40 * 50)
+                {
+                    StartAttract();
+                    return;
+                }
+                run.Step();
+                Attract.Update(run);
+                ConsumeRunEvents(run);
+                SpawnContactSparks(run);
+                return;
+            }
             if (run.Done && !_resultsPending) return;
             run.Step();
             if (GhostRun != null && GhostEnabled) GhostRun.Step();
@@ -641,7 +693,7 @@ namespace CyberRider.Unity
                 Rider rider = Run.Rider;
                 Vec2d c = rider.Center();
                 Vec2d v = rider.Velocity();
-                double lead = Mode == GameMode.Arcade ? 90 / Camera.Zoom : 12;
+                double lead = Mode == GameMode.Arcade ? 90 / Camera.Zoom : Mode == GameMode.Attract ? 110 / Camera.Zoom : 12;
                 Camera.Follow(c.X + v.X * 6 + lead, c.Y + v.Y * 3);
             }
         }

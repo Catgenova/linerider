@@ -45,7 +45,10 @@ namespace CyberRider.Unity
             Current = name;
             UiKit.Clear(_root);
             _root.gameObject.SetActive(true);
-            Image panel = UiKit.Panel(_root, "Panel", UiKit.PanelColor);
+            // Let the demo ride show through the menus that sit on top of it.
+            bool attract = _game.Mode == GameMode.Attract;
+            _overlay.color = new Color(3 / 255f, 1 / 255f, 10 / 255f, attract ? 0.5f : 0.92f);
+            Image panel = UiKit.Panel(_root, "Panel", attract ? new Color(8 / 255f, 4 / 255f, 28 / 255f, 0.78f) : UiKit.PanelColor);
             RectTransform prt = panel.rectTransform;
             prt.anchorMin = new Vector2(0.5f, 0);
             prt.anchorMax = new Vector2(0.5f, 1);
@@ -97,8 +100,9 @@ namespace CyberRider.Unity
 
         public void Title()
         {
-            Transform c = Panel("title", 720);
             GameController g = _game;
+            if (g.Mode != GameMode.Attract) g.StartAttract();
+            Transform c = Panel("title", 720);
             g.Progress.TotalMedals(out _, out _, out int gold);
             int done = 0;
             foreach (LevelDef l in Levels.All) if (g.Progress.IsComplete(l.Id)) done++;

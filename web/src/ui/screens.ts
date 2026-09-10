@@ -40,6 +40,8 @@ export class Screens {
     clear(this.root);
     this.root.append(...nodes);
     this.root.classList.add('show');
+    // Let the demo ride show through the menus that sit on top of it.
+    this.root.classList.toggle('attract', this.game.mode === 'attract');
   }
 
   private panel(cls: string, children: (HTMLElement | string | null | false)[]): HTMLElement {
@@ -50,6 +52,7 @@ export class Screens {
 
   title(): void {
     const g = this.game;
+    if (g.mode !== 'attract') g.startAttract();
     const medals = g.progress.totalMedals();
     const done = LEVELS.filter((l) => g.progress.isComplete(l.id)).length;
     this.mount(

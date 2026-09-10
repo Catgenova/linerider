@@ -52,7 +52,7 @@ namespace CyberRider.Unity
             {
                 var es = new GameObject("EventSystem");
                 es.AddComponent<EventSystem>();
-                es.AddComponent<StandaloneInputModule>();
+                InputBridge.AddUiModule(es);
             }
 
             var canvasGo = new GameObject("Canvas");

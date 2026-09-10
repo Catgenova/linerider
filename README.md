@@ -14,6 +14,10 @@ last digit, share codes work across both, and the daily challenge is the same te
    for Unity 2022.3 LTS (`ProjectSettings/ProjectVersion.txt`); any 2022.3 or newer editor works.
 2. Open `Assets/Scenes/Main.unity` and press Play. The scene holds a camera and one `GameBootstrap`
    component; everything else (renderer, UI, audio, input) is created in code at runtime.
+   Input works with either backend: the project ships with **Active Input Handling = Both**, so the
+   classic Input Manager is read; in a project where only the Input System package is active
+   (`com.unity.inputsystem`, listed in `Packages/manifest.json`), the same scripts read its Mouse and
+   Keyboard devices and drive the UI through `InputSystemUIInputModule`.
 3. Build settings already list the scene, so **File > Build Settings > Build** produces a desktop
    player. Save data and published tracks are written to `Application.persistentDataPath`.
 
@@ -22,7 +26,7 @@ Layout:
 ```
 Assets/Scenes/Main.unity           bootstrap scene
 Assets/Scripts/Core/               engine-agnostic C# (no UnityEngine): physics, track, levels, run, editor,
-                                   tricks, daily/arcade directors, library, progress, JSON
+                                   tricks, daily/arcade/attract directors, library, progress, JSON
 Assets/Scripts/Unity/              MonoBehaviours and views: controller, neon mesh renderer, uGUI HUD/menus,
                                    procedural audio, input, bootstrap
 Assets/Resources/Shaders/          additive and alpha vertex-colour shaders used by the renderer
