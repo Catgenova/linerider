@@ -35,4 +35,5 @@ function frame(now: number): void {
 requestAnimationFrame(frame);
 
 // Expose for debugging in the console.
-(window as unknown as { game: Game }).game = game;
+(window as unknown as { game: Game; ui: { screens: Screens; hud: Hud } }).game = game;
+(window as unknown as { game: Game; ui: { screens: Screens; hud: Hud } }).ui = { screens, hud };

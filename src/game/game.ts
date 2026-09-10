@@ -4,11 +4,12 @@ import { Editor, type ToolId } from '../editor/editor';
 import { FRAME_MS, PX_PER_METER, SIM_FPS } from '../physics/constants';
 import { MATERIAL_ORDER, type MaterialId } from '../physics/materials';
 import { Effects } from '../render/effects';
+import { GameAudio } from './audio';
 import { Renderer, type Marker, type Scene } from '../render/renderer';
-import { entityStaticLines } from './entities';
 import { ENVIRONMENTS, type Environment, type EnvironmentId } from './environments';
 import { evaluateLevel, type LevelDef, type Medal, type ObjectiveResult, type RunSummary } from './level';
 import { LEVELS, REGIONS, levelById, nextLevel } from './levels';
+import { trackFromLevel } from './loadLevel';
 import { LocalTrackStore, type PublishedTrack } from './library';
 import { Progress } from './progress';
 import { RIDERS, type RiderDef, type RiderId } from './riders';
@@ -45,6 +46,7 @@ export class Game {
   readonly renderer: Renderer;
   readonly effects = new Effects();
   readonly progress = new Progress();
+  readonly audio: GameAudio;
   readonly store = new LocalTrackStore(BUILTIN_TRACKS);
   track = new Track();
   editor: Editor;
@@ -79,6 +81,15 @@ export class Game {
     this.renderer.resize(this.camera);
     const savedRider = this.progress.data.settings.rider as RiderId;
     if (RIDERS[savedRider]) this.riderDef = RIDERS[savedRider];
+    this.audio = new GameAudio(this.progress.data.settings.music);
+  }
+
+  toggleMusic(): void {
+    const v = !this.audio.enabled;
+    this.audio.setEnabled(v);
+    this.progress.data.settings.music = v;
+    this.progress.save();
+    this.callbacks.onStateChange();
   }
 
   private bindEditorEvents(): void {
@@ -105,22 +116,8 @@ export class Game {
     this.finishPlacement = 'none';
   }
 
-  /** Build a fresh track from a level definition. */
-  static trackFromLevel(level: LevelDef): Track {
-    const track = new Track();
-    track.start = { ...level.start };
-    track.finish = level.finish ? { ...level.finish } : undefined;
-    for (const l of level.lines) {
-      track.addLine({ ...l, layer: 'level' });
-    }
-    for (const def of level.entities ?? []) {
-      for (const l of entityStaticLines(def)) track.addLine({ ...l, layer: 'level' });
-    }
-    return track;
-  }
-
   loadLevel(level: LevelDef, riderId?: RiderId, coop = false): void {
-    this.resetTrack(Game.trackFromLevel(level));
+    this.resetTrack(trackFromLevel(level));
     this.level = level;
     this.mode = coop ? 'coop' : 'campaign';
     this.environment = ENVIRONMENTS[level.environment];
@@ -139,11 +136,19 @@ export class Game {
     this.editor.material = level.materials[0];
     this.editor.tool = 'pencil';
     this.camera.zoom = level.zoom ?? 2;
-    const focus = level.focus ?? level.start;
-    this.camera.snapTo(focus.x + 80, focus.y);
+    this.focusLevelCamera();
     this.loadGhost(level.id);
     this.progress.recordAttempt(level.id);
     this.callbacks.onStateChange();
+  }
+
+  /** Centre on the level's focus point while keeping the start clear of the toolbar. */
+  focusLevelCamera(): void {
+    const level = this.level;
+    if (!level) return;
+    const focus = level.focus ?? level.start;
+    const maxCx = level.start.x + (this.camera.width / 2 - 170) / this.camera.zoom;
+    this.camera.snapTo(Math.min(focus.x, maxCx), focus.y);
   }
 
   private loadGhost(levelId: string): void {
@@ -399,6 +404,7 @@ export class Game {
       }
       if (steps === 12) this.accumulator = 0;
     }
+    this.audio.riding = this.playState === 'play' && !!this.run && !this.run.done;
     this.effects.update((dt * 1000 * (this.playState === 'play' ? this.speed : 1)) / FRAME_MS);
     this.updateCamera(dt);
     this.camera.update(dt);
@@ -432,13 +438,16 @@ export class Game {
       switch (ev.type) {
         case 'trick':
           fx.popup(ev.x, ev.y, ev.text, ev.color, ev.text.startsWith('BAIL') ? 1 : 1.1);
+          if (ev.points) this.audio.trick(ev.points);
           break;
         case 'flag':
+          this.audio.pickup();
           fx.popup(ev.x, ev.y, 'FLAG', '#ffe93a', 1.2);
           fx.ring(ev.x, ev.y + 16, 30, '#ffe93a');
           fx.spark(ev.x, ev.y + 16, 20, '#ffe93a', 2.5);
           break;
         case 'rescue':
+          this.audio.pickup();
           fx.popup(ev.x, ev.y, 'RESCUED', '#ff7ae8', 1.2);
           fx.ring(ev.x, ev.y + 16, 30, '#ff7ae8');
           break;
@@ -448,12 +457,14 @@ export class Game {
           fx.spark(ev.x, ev.y + 16, 60, '#4dff9d', 4);
           fx.flash = 0.35;
           fx.flashColor = '#4dff9d';
+          this.audio.finish();
           this.callbacks.onMessage('FINISH', '#4dff9d', true);
           break;
         case 'death':
           fx.popup(ev.x, ev.y, 'WIPEOUT', '#ff4d4d', 1.4);
           fx.spark(ev.x, ev.y + 12, 40, '#ff4d4d', 3);
           fx.shake = 8;
+          this.audio.crash();
           this.callbacks.onMessage('WIPEOUT', '#ff4d4d', true);
           break;
         case 'message':
@@ -470,6 +481,7 @@ export class Game {
         fx.popup(ev.x, ev.y - 10, 'SMASH', '#ffb347', 1.2);
         fx.shake = Math.max(fx.shake, 5);
       } else if (ev.type === 'explode') {
+        this.audio.explosion();
         fx.explosion(ev.x, ev.y, ev.radius);
         fx.popup(ev.x, ev.y - 30, 'BOOM', '#ffb347', 1.5);
       } else if (ev.type === 'impact' && ev.speed > 4) {
@@ -604,6 +616,7 @@ export class Game {
       finish: level?.finish ?? this.track.finish ?? null,
       markers,
       focusRider: 0,
+      focusPoint: this.editor.cursorWorld,
       showEditorOverlay: true,
     };
   }

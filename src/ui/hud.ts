@@ -117,6 +117,7 @@ export class Hud {
       ),
       el('div', { class: 'sep' }),
       el('button', { class: `btn small${game.ghostEnabled ? ' active' : ''}`, text: 'ghost', title: 'Race your best run (G)', onClick: () => game.toggleGhost() }),
+      el('button', { class: `btn small${game.audio.enabled ? ' active' : ''}`, text: '♪', title: 'Music and sound', onClick: () => game.toggleMusic() }),
     );
 
     const level = game.level;

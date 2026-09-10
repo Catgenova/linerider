@@ -37,8 +37,8 @@ export class Prop {
   readonly radius: number;
   readonly mass: number;
   readonly explosive: boolean;
-  readonly originX: number;
-  readonly originY: number;
+  originX: number;
+  originY: number;
   readonly width: number;
   readonly height: number;
   gravityScale: number;
@@ -137,6 +137,21 @@ export class Prop {
 
   wake(): void {
     this.dormant = false;
+  }
+
+  /** Treat the current (settled) position as the origin and clear any disturbance. */
+  rehome(): void {
+    const c = this.center();
+    this.originX = c.x;
+    this.originY = c.y;
+    this.disturbed = false;
+    this.lastImpact = 0;
+    for (const p of this.points) {
+      p.px = p.x;
+      p.py = p.y;
+      p.vx = 0;
+      p.vy = 0;
+    }
   }
 
   step(gx: number, gy: number): void {

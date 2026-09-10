@@ -48,6 +48,7 @@ export class World {
   private readonly near: Line[] = [];
   private readonly ctx: CollideContext = { frame: 0, frictionScale: 1, riderFriction: 1 };
   private readonly windOut = { x: 0, y: 0 };
+  private readonly faceScratch = new Float64Array(4 * 3);
   nextDynamicId = 1_000_000;
 
   addLine(init: LineInit): Line {
@@ -112,6 +113,35 @@ export class World {
       b.x += dx * scalar * (1 - link.bias);
       b.y += dy * scalar * (1 - link.bias);
     }
+  }
+
+  /**
+   * Let props come to rest on the terrain before the run starts, so stacks that shift a pixel
+   * while settling do not count as disturbed. Riders and entities are not touched.
+   */
+  settleProps(frames = 60): void {
+    if (this.props.length === 0) return;
+    const gx = this.gravityX * this.gravityScale;
+    const gy = this.gravityY * this.gravityScale;
+    for (let f = 0; f < frames; f++) {
+      this.ctx.frame = -frames + f;
+      for (const prop of this.props) prop.step(gx, gy);
+      for (let it = 0; it < ITERATIONS; it++) {
+        for (const prop of this.props) prop.satisfy();
+        for (const prop of this.props) {
+          if (!prop.active || prop.dormant) continue;
+          if (prop.isCircle) this.collideCircle(prop);
+          else for (const p of prop.points) this.collidePoint(p);
+        }
+        for (let i = 0; i < this.props.length; i++) {
+          for (let j = i + 1; j < this.props.length; j++) this.collideProps(this.props[i], this.props[j]);
+        }
+      }
+    }
+    for (const prop of this.props) prop.rehome();
+    this.events = [];
+    this.crumbling.clear();
+    for (const line of this.lines.values()) line.crumbleAt = -1;
   }
 
   /** Advance the world by one simulation frame. */
@@ -263,12 +293,16 @@ export class World {
     }
   }
 
-  /** Push points out of a prop's outline (box edges) or radius (circle). */
-  private collidePointsWithProp(points: Point[], pointMass: number, prop: Prop, wakeProp: boolean): void {
+  /**
+   * Push points out of a prop's outline (box edges) or radius (circle). For boxes each point is
+   * resolved against its closest penetrated face only, which keeps stacked boxes from sliding off
+   * each other at corner-on-corner contacts.
+   */
+  private collidePointsWithProp(points: Point[], pointMass: number, prop: Prop, wakeProp: boolean, margin = 1.2): void {
     const share = prop.mass / (prop.mass + pointMass); // how much the point moves
     if (prop.isCircle) {
       const c = prop.points[0];
-      const r = prop.radius;
+      const r = prop.radius + (margin > 1.2 ? margin : 0);
       for (const p of points) {
         const dx = p.x - c.x;
         const dy = p.y - c.y;
@@ -288,33 +322,67 @@ export class World {
       }
       return;
     }
-    const margin = 1.2;
-    for (const [ia, ib] of prop.edges) {
-      const a = prop.points[ia];
-      const b = prop.points[ib];
-      const ex = b.x - a.x;
-      const ey = b.y - a.y;
-      const len2 = ex * ex + ey * ey;
-      if (len2 === 0) continue;
-      const len = Math.sqrt(len2);
-      const nx = -ey / len;
-      const ny = ex / len;
-      for (const p of points) {
-        const t = ((p.x - a.x) * ex + (p.y - a.y) * ey) / len2;
-        if (t < -0.05 || t > 1.05) continue;
+    const pts = prop.points;
+    const nFaces = prop.edges.length;
+    const fn = this.faceScratch;
+    for (const p of points) {
+      // Signed distance of the point (and its previous position) to every face's infinite line,
+      // measured along the inward normal. Inside the convex box means every distance is >= 0.
+      let negCount = 0;
+      let minNeg = 0;
+      let closestNeg = -Infinity;
+      let closestNegIdx = -1;
+      let nearestD = Infinity;
+      let nearestIdx = -1;
+      let crossedIdx = -1;
+      let crossedDp = 0;
+      for (let i = 0; i < nFaces; i++) {
+        const a = pts[prop.edges[i][0]];
+        const b = pts[prop.edges[i][1]];
+        const ex = b.x - a.x;
+        const ey = b.y - a.y;
+        const len = Math.sqrt(ex * ex + ey * ey) || 1;
+        const nx = -ey / len;
+        const ny = ex / len;
         const d = (p.x - a.x) * nx + (p.y - a.y) * ny;
-        if (Math.abs(d) >= margin) {
-          // Did the point cross the edge this frame?
-          const dp = (p.px - a.x) * nx + (p.py - a.y) * ny;
-          if ((dp >= 0) === (d >= 0)) continue;
-          const side = dp >= 0 ? 1 : -1;
-          this.resolveEdge(p, a, b, nx, ny, d, side * margin, t, share, prop, wakeProp);
-        } else {
-          const dp = (p.px - a.x) * nx + (p.py - a.y) * ny;
-          const side = dp >= 0 ? 1 : -1;
-          this.resolveEdge(p, a, b, nx, ny, d, side * margin, t, share, prop, wakeProp);
+        const dp = (p.px - a.x) * nx + (p.py - a.y) * ny;
+        fn[i * 3] = nx;
+        fn[i * 3 + 1] = ny;
+        fn[i * 3 + 2] = d;
+        if (d < 0) {
+          negCount++;
+          if (d < minNeg) minNeg = d;
+          if (d > closestNeg) {
+            closestNeg = d;
+            closestNegIdx = i;
+          }
+        }
+        if (d < nearestD) {
+          nearestD = d;
+          nearestIdx = i;
+        }
+        if (dp < crossedDp) {
+          crossedDp = dp;
+          crossedIdx = i;
         }
       }
+      let f = -1;
+      if (negCount === 0) {
+        // Inside: leave through the face it came in by, else the nearest face.
+        f = crossedIdx >= 0 ? crossedIdx : nearestIdx;
+      } else if (minNeg > -margin) {
+        // Outside but within the contact margin of the face(s) it is beyond.
+        f = closestNegIdx;
+      }
+      if (f < 0) continue;
+      const a = pts[prop.edges[f][0]];
+      const b = pts[prop.edges[f][1]];
+      const ex = b.x - a.x;
+      const ey = b.y - a.y;
+      const len2 = ex * ex + ey * ey || 1;
+      const t = ((p.x - a.x) * ex + (p.y - a.y) * ey) / len2;
+      const d = fn[f * 3 + 2];
+      this.resolveEdge(p, a, b, fn[f * 3], fn[f * 3 + 1], -(d + margin), t, share, prop, wakeProp);
     }
   }
 
@@ -324,14 +392,12 @@ export class World {
     b: Point,
     nx: number,
     ny: number,
-    d: number,
-    target: number,
+    delta: number,
     t: number,
     share: number,
     prop: Prop,
     wakeProp: boolean,
   ): void {
-    const delta = target - d;
     p.x += nx * delta * share;
     p.y += ny * delta * share;
     if (prop.dormant) {
@@ -397,11 +463,11 @@ export class World {
       return;
     }
     if (a.isCircle) {
-      this.collidePointsWithProp(a.points, a.mass, b, true);
+      this.collidePointsWithProp(a.points, a.mass, b, true, a.radius);
       return;
     }
     if (b.isCircle) {
-      this.collidePointsWithProp(b.points, b.mass, a, true);
+      this.collidePointsWithProp(b.points, b.mass, a, true, b.radius);
       return;
     }
     this.collidePointsWithProp(a.points, a.mass, b, true);

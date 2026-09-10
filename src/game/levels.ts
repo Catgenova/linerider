@@ -43,18 +43,18 @@ function poly(points: [number, number][], material?: MaterialId): LevelLine[] {
   return out;
 }
 
-/** A closed box (floor, right wall, ceiling, left wall) solid from the outside. */
+/**
+ * A pillar: rideable top, walls solid from the outside. The walls start a little below the top so
+ * their collision zones never overlap the surface the rider travels along.
+ */
 function box(x: number, y: number, w: number, h: number, material?: MaterialId): LevelLine[] {
-  return poly(
-    [
-      [x, y],
-      [x + w, y],
-      [x + w, y + h],
-      [x, y + h],
-      [x, y],
-    ],
-    material,
-  );
+  const inset = 12;
+  return [
+    line(x, y, x + w, y, material),
+    line(x + w, y + inset, x + w, y + h, material),
+    line(x + w, y + h, x, y + h, material),
+    line(x, y + h, x, y + inset, material),
+  ];
 }
 
 /** Wall segment solid on its left face (drawn bottom to top). */

@@ -228,11 +228,33 @@ export class Track {
     if (set.size === 0) this.endpoints.delete(k);
   }
 
+  /**
+   * A joint extends a line's collision past its endpoint only when another line continues on
+   * from that point in roughly the same direction. Sharp corners (a wall meeting a ledge) get no
+   * extension, which stops the wall from poking up through the surface the rider is on.
+   */
   private refreshExtensions(line: LineData): void {
-    const left = this.endpoints.get(keyOf(line.x1, line.y1));
-    const right = this.endpoints.get(keyOf(line.x2, line.y2));
-    line.leftExt = !!left && left.size > 1;
-    line.rightExt = !!right && right.size > 1;
+    line.leftExt = this.hasContinuation(line, line.x1, line.y1, line.x1 - line.x2, line.y1 - line.y2);
+    line.rightExt = this.hasContinuation(line, line.x2, line.y2, line.x2 - line.x1, line.y2 - line.y1);
+  }
+
+  private hasContinuation(line: LineData, px: number, py: number, outX: number, outY: number): boolean {
+    const set = this.endpoints.get(keyOf(px, py));
+    if (!set || set.size < 2) return false;
+    const outLen = Math.sqrt(outX * outX + outY * outY) || 1;
+    for (const id of set) {
+      if (id === line.id) continue;
+      const other = this.lines.get(id);
+      if (!other) continue;
+      // Direction of the other line leading away from the shared point.
+      const atStart = keyOf(other.x1, other.y1) === keyOf(px, py);
+      const dx = atStart ? other.x2 - other.x1 : other.x1 - other.x2;
+      const dy = atStart ? other.y2 - other.y1 : other.y1 - other.y2;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const cos = (dx * outX + dy * outY) / (len * outLen);
+      if (cos > 0.5) return true; // within 60 degrees of straight on
+    }
+    return false;
   }
 }
 

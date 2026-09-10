@@ -37,6 +37,7 @@ export class Run {
   readonly level: LevelDef | null;
   readonly track: Track;
   readonly riderDef: RiderDef;
+  readonly endless: boolean;
   finished = false;
   finishFrame = -1;
   died = false;
@@ -52,12 +53,16 @@ export class Run {
   readonly events: RunEvent[] = [];
   private readonly trickEvents: TrickEvent[] = [];
   private lastCargoV = { x: 0, y: 0 };
+  private stalledFrames = 0;
+  private visited = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  private lastProgressFrame = 0;
   private readonly changeHandler: (c: TrackChange) => void;
 
   constructor(opts: RunOptions) {
     this.track = opts.track;
     this.level = opts.level;
     this.riderDef = opts.riderDef;
+    this.endless = opts.endless ?? false;
     const env = opts.environment;
     const world = this.world;
     world.gravityScale = env.gravityScale;
@@ -66,6 +71,17 @@ export class Run {
     for (const l of opts.track.lines.values()) {
       const line = world.addLine(l);
       line.player = l.player;
+    }
+    const level = opts.level;
+    if (level) {
+      for (const def of level.entities ?? []) {
+        const e = buildEntity(def, world);
+        if (e) world.addEntity(e);
+      }
+      for (const pd of level.props ?? []) {
+        world.addProp(new Prop({ ...pd, id: world.nextDynamicId++ }));
+      }
+      world.settleProps(200);
     }
     const start = opts.track.start;
     const rd = opts.riderDef;
@@ -78,19 +94,9 @@ export class Run {
     world.addRider(this.rider);
     this.tricks = new TrickTracker(this.rider);
     this.maxX = start.x;
-    const level = opts.level;
     this.flags = (level?.flags ?? []).map(() => false);
     this.rescues = (level?.rescues ?? []).map(() => false);
-    if (level) {
-      for (const def of level.entities ?? []) {
-        const e = buildEntity(def, world);
-        if (e) world.addEntity(e);
-      }
-      for (const pd of level.props ?? []) {
-        world.addProp(new Prop({ ...pd, id: world.nextDynamicId++ }));
-      }
-      if (level.mode === 'delivery') this.attachCargo();
-    }
+    if (level?.mode === 'delivery') this.attachCargo();
     this.changeHandler = (c) => this.applyChange(c);
     opts.track.onChange = this.changeHandler;
     const skip = opts.skipFrames ?? 0;
@@ -221,6 +227,20 @@ export class Run {
     }
     if (this.died && !this.failReason && this.deadFor() > 90 && !this.finished) {
       this.failReason = 'Crashed';
+    }
+    // A rider that has come to rest, or is just rocking back and forth, is not going anywhere.
+    if (!this.finished && !this.failReason && !this.died && !this.endless && world.frame > 40) {
+      const v = rider.velocity();
+      if (Math.abs(v.x) + Math.abs(v.y) < 0.25) this.stalledFrames++;
+      else this.stalledFrames = 0;
+      const vis = this.visited;
+      let grew = false;
+      if (c.x < vis.minX - 4) { vis.minX = c.x; grew = true; }
+      if (c.x > vis.maxX + 4) { vis.maxX = c.x; grew = true; }
+      if (c.y < vis.minY - 4) { vis.minY = c.y; grew = true; }
+      if (c.y > vis.maxY + 4) { vis.maxY = c.y; grew = true; }
+      if (grew) this.lastProgressFrame = world.frame;
+      if (this.stalledFrames > 120 || world.frame - this.lastProgressFrame > 320) this.failReason = 'Stalled';
     }
     // Fell into the void.
     if (!this.failReason && !this.finished && c.y > (this.track.bounds()?.maxY ?? 0) + 1500) {

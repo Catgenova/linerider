@@ -9,6 +9,8 @@ export function bindInput(canvas: HTMLCanvasElement, game: Game, screens: Screen
     return { x: ev.clientX - r.left, y: ev.clientY - r.top };
   };
   canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
+  window.addEventListener('pointerdown', () => game.audio.unlock(), { capture: true });
+  window.addEventListener('keydown', () => game.audio.unlock(), { capture: true });
   canvas.addEventListener('pointerdown', (ev) => {
     if (screens.open) return;
     canvas.setPointerCapture(ev.pointerId);

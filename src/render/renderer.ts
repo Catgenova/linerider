@@ -40,6 +40,8 @@ export interface Scene {
   bounds?: { minX: number; minY: number; maxX: number; maxY: number } | null;
   /** Rider index the darkness halo follows. */
   focusRider: number;
+  /** World point the darkness halo follows when no rider is running (the cursor). */
+  focusPoint: { x: number; y: number } | null;
   showEditorOverlay: boolean;
 }
 
@@ -673,11 +675,12 @@ export class Renderer {
       fx = s.x;
       fy = s.y;
     } else {
-      const s = cam.toScreen(scene.start.x, scene.start.y);
+      const p = scene.focusPoint ?? scene.start;
+      const s = cam.toScreen(p.x, p.y);
       fx = s.x;
       fy = s.y;
     }
-    const r = radius * cam.zoom;
+    const r = radius * cam.zoom * (rider ? 1 : 1.4);
     const g = ctx.createRadialGradient(fx, fy, r * 0.35, fx, fy, r);
     g.addColorStop(0, 'rgba(2,1,6,0)');
     g.addColorStop(0.7, 'rgba(2,1,6,0.75)');
