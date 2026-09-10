@@ -1,0 +1,20 @@
+{
+  "name": "neon-linerider",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A neon cyberpunk rebuild of Line Rider with campaign, puzzle, and arcade modes.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}

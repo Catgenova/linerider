@@ -1,0 +1,366 @@
+import { distToSegment, type Vec } from '../core/vec';
+import { PX_PER_METER } from '../physics/constants';
+import { MATERIALS, type MaterialId } from '../physics/materials';
+import type { LineData, Track } from '../game/track';
+import type { Camera } from './camera';
+
+export type ToolId = 'pencil' | 'line' | 'eraser' | 'pan' | 'flip';
+
+export interface EditorConstraints {
+  /** Ink budget in metres, or null for unlimited. */
+  budget: number | null;
+  /** Materials the player may draw with. */
+  materials: MaterialId[];
+  /** Whether level geometry can be erased. */
+  canEraseLevel: boolean;
+  /** Co-op player id stamped on new lines (0 = single player). */
+  player: number;
+  /** Disables all editing. */
+  locked: boolean;
+}
+
+interface Command {
+  added: LineData[];
+  removed: LineData[];
+}
+
+export interface EditorEvents {
+  onInkExhausted?: () => void;
+  onEdit?: () => void;
+}
+
+/** Mouse/touch driven track editing with undo/redo and budget enforcement. */
+export class Editor {
+  tool: ToolId = 'pencil';
+  material: MaterialId = 'normal';
+  constraints: EditorConstraints = {
+    budget: null,
+    materials: ['normal', 'accel', 'scenery'],
+    canEraseLevel: false,
+    player: 0,
+    locked: false,
+  };
+  events: EditorEvents = {};
+  /** Straight-line preview (world coords) while dragging. */
+  preview: { x1: number; y1: number; x2: number; y2: number } | null = null;
+  /** Line under the cursor for highlight. */
+  hoverId = -1;
+  cursorWorld: Vec = { x: 0, y: 0 };
+  eraserRadiusScreen = 9;
+  private undoStack: Command[] = [];
+  private redoStack: Command[] = [];
+  private current: Command | null = null;
+  private dragging = false;
+  private panning = false;
+  private lastScreen: Vec = { x: 0, y: 0 };
+  private anchor: Vec | null = null;
+  private lastPencil: Vec | null = null;
+  private exhaustedNotified = false;
+  private spaceHeld = false;
+
+  constructor(
+    public readonly track: Track,
+    public readonly camera: Camera,
+  ) {}
+
+  setSpaceHeld(v: boolean): void {
+    this.spaceHeld = v;
+  }
+
+  get inkUsed(): number {
+    return this.track.inkUsed(this.constraints.player || undefined);
+  }
+
+  get inkRemaining(): number {
+    const b = this.constraints.budget;
+    return b === null ? Infinity : Math.max(0, b - this.inkUsed);
+  }
+
+  canUseMaterial(m: MaterialId): boolean {
+    return this.constraints.materials.includes(m);
+  }
+
+  private snapRadiusWorld(): number {
+    return 8 / this.camera.zoom;
+  }
+
+  private snap(x: number, y: number): Vec {
+    const s = this.track.snapPoint(x, y, this.snapRadiusWorld());
+    return s ?? { x, y };
+  }
+
+  pointerDown(sx: number, sy: number, button: number, shift: boolean): void {
+    this.lastScreen = { x: sx, y: sy };
+    const w = this.camera.toWorld(sx, sy);
+    this.cursorWorld = w;
+    if (button === 1 || this.spaceHeld || this.tool === 'pan') {
+      this.panning = true;
+      return;
+    }
+    if (button === 2) {
+      // Right-click flips the nearest line.
+      const id = this.findNearest(w.x, w.y, 10 / this.camera.zoom);
+      if (id >= 0 && !this.constraints.locked) this.flip(id);
+      return;
+    }
+    if (this.constraints.locked) return;
+    this.dragging = true;
+    switch (this.tool) {
+      case 'pencil': {
+        const p = this.snap(w.x, w.y);
+        this.lastPencil = p;
+        this.current = { added: [], removed: [] };
+        this.exhaustedNotified = false;
+        break;
+      }
+      case 'line': {
+        const p = this.snap(w.x, w.y);
+        this.anchor = p;
+        this.preview = { x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+        break;
+      }
+      case 'eraser': {
+        this.current = { added: [], removed: [] };
+        this.eraseAt(w.x, w.y);
+        break;
+      }
+      case 'flip': {
+        const id = this.findNearest(w.x, w.y, 10 / this.camera.zoom);
+        if (id >= 0) this.flip(id);
+        break;
+      }
+      default:
+        break;
+    }
+    void shift;
+  }
+
+  pointerMove(sx: number, sy: number, shift: boolean): void {
+    const w = this.camera.toWorld(sx, sy);
+    this.cursorWorld = w;
+    if (this.panning) {
+      this.camera.panBy(sx - this.lastScreen.x, sy - this.lastScreen.y);
+      this.lastScreen = { x: sx, y: sy };
+      return;
+    }
+    this.lastScreen = { x: sx, y: sy };
+    if (!this.dragging) {
+      if (this.tool === 'eraser' || this.tool === 'flip') {
+        this.hoverId = this.findNearest(w.x, w.y, 10 / this.camera.zoom);
+      } else this.hoverId = -1;
+      return;
+    }
+    switch (this.tool) {
+      case 'pencil': {
+        if (!this.lastPencil) break;
+        const minSeg = Math.max(2, 5 / this.camera.zoom);
+        const dx = w.x - this.lastPencil.x;
+        const dy = w.y - this.lastPencil.y;
+        if (dx * dx + dy * dy < minSeg * minSeg) break;
+        const added = this.addLine(this.lastPencil.x, this.lastPencil.y, w.x, w.y);
+        if (added) {
+          this.lastPencil = { x: added.x2, y: added.y2 };
+          if (added.x2 !== w.x || added.y2 !== w.y) {
+            // Budget truncated the segment: stop the stroke here.
+            this.lastPencil = null;
+          }
+        } else this.lastPencil = null;
+        break;
+      }
+      case 'line': {
+        if (!this.anchor) break;
+        let end = this.snap(w.x, w.y);
+        if (shift) {
+          const ang = Math.atan2(end.y - this.anchor.y, end.x - this.anchor.x);
+          const step = Math.PI / 12;
+          const snapped = Math.round(ang / step) * step;
+          const len = Math.sqrt((end.x - this.anchor.x) ** 2 + (end.y - this.anchor.y) ** 2);
+          end = { x: this.anchor.x + Math.cos(snapped) * len, y: this.anchor.y + Math.sin(snapped) * len };
+        }
+        this.preview = { x1: this.anchor.x, y1: this.anchor.y, x2: end.x, y2: end.y };
+        break;
+      }
+      case 'eraser':
+        this.eraseAt(w.x, w.y);
+        break;
+      default:
+        break;
+    }
+  }
+
+  pointerUp(): void {
+    if (this.panning) {
+      this.panning = false;
+      return;
+    }
+    if (!this.dragging) return;
+    this.dragging = false;
+    switch (this.tool) {
+      case 'pencil':
+        this.commit();
+        this.lastPencil = null;
+        break;
+      case 'line': {
+        if (this.preview) {
+          const p = this.preview;
+          const len = Math.sqrt((p.x2 - p.x1) ** 2 + (p.y2 - p.y1) ** 2);
+          if (len >= 1) {
+            this.current = { added: [], removed: [] };
+            this.addLine(p.x1, p.y1, p.x2, p.y2);
+            this.commit();
+          }
+        }
+        this.preview = null;
+        this.anchor = null;
+        break;
+      }
+      case 'eraser':
+        this.commit();
+        break;
+      default:
+        break;
+    }
+  }
+
+  cancel(): void {
+    this.dragging = false;
+    this.panning = false;
+    this.preview = null;
+    this.anchor = null;
+    this.lastPencil = null;
+    this.commit();
+  }
+
+  wheel(sx: number, sy: number, deltaY: number): void {
+    const factor = Math.exp(-deltaY * 0.0012);
+    this.camera.zoomAt(sx, sy, factor);
+  }
+
+  /** Add a line respecting the ink budget. Returns the line actually added (possibly truncated). */
+  addLine(x1: number, y1: number, x2: number, y2: number): LineData | null {
+    if (this.constraints.locked) return null;
+    const material = this.canUseMaterial(this.material) ? this.material : this.constraints.materials[0];
+    if (!material) return null;
+    const costPerPx = MATERIALS[material].cost / PX_PER_METER;
+    let ex = x2;
+    let ey = y2;
+    const len = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+    if (len < 0.5) return null;
+    if (costPerPx > 0) {
+      const remaining = this.inkRemaining;
+      const cost = len * costPerPx;
+      if (cost > remaining) {
+        const allowed = remaining / costPerPx;
+        if (allowed < 2) {
+          if (!this.exhaustedNotified) {
+            this.exhaustedNotified = true;
+            this.events.onInkExhausted?.();
+          }
+          return null;
+        }
+        ex = x1 + ((x2 - x1) * allowed) / len;
+        ey = y1 + ((y2 - y1) * allowed) / len;
+        this.exhaustedNotified = true;
+        this.events.onInkExhausted?.();
+      }
+    }
+    const line = this.track.addLine({
+      x1,
+      y1,
+      x2: ex,
+      y2: ey,
+      material,
+      layer: 'player',
+      player: this.constraints.player,
+    });
+    if (!this.current) this.current = { added: [], removed: [] };
+    this.current.added.push({ ...line });
+    this.events.onEdit?.();
+    return line;
+  }
+
+  private eraseAt(x: number, y: number): void {
+    const r = this.eraserRadiusScreen / this.camera.zoom;
+    const hits: LineData[] = [];
+    for (const l of this.track.lines.values()) {
+      if (l.layer === 'level' && !this.constraints.canEraseLevel) continue;
+      if (this.constraints.player && l.player !== this.constraints.player && l.layer === 'player') continue;
+      if (distToSegment(x, y, l.x1, l.y1, l.x2, l.y2) <= r) hits.push(l);
+    }
+    for (const l of hits) {
+      this.track.removeLine(l.id);
+      this.current?.removed.push({ ...l });
+    }
+    if (hits.length) this.events.onEdit?.();
+  }
+
+  private flip(id: number): void {
+    const l = this.track.lines.get(id);
+    if (!l) return;
+    if (l.layer === 'level' && !this.constraints.canEraseLevel) return;
+    this.track.flipLine(id);
+    this.events.onEdit?.();
+  }
+
+  private findNearest(x: number, y: number, radius: number): number {
+    let best = -1;
+    let bestD = radius;
+    for (const l of this.track.lines.values()) {
+      const d = distToSegment(x, y, l.x1, l.y1, l.x2, l.y2);
+      if (d < bestD) {
+        bestD = d;
+        best = l.id;
+      }
+    }
+    return best;
+  }
+
+  private commit(): void {
+    if (this.current && (this.current.added.length || this.current.removed.length)) {
+      this.undoStack.push(this.current);
+      if (this.undoStack.length > 200) this.undoStack.shift();
+      this.redoStack.length = 0;
+    }
+    this.current = null;
+  }
+
+  undo(): void {
+    const cmd = this.undoStack.pop();
+    if (!cmd) return;
+    for (const l of cmd.added) this.track.removeLine(l.id);
+    for (const l of cmd.removed) this.track.addLine(l, l.id);
+    this.redoStack.push(cmd);
+    this.events.onEdit?.();
+  }
+
+  redo(): void {
+    const cmd = this.redoStack.pop();
+    if (!cmd) return;
+    for (const l of cmd.removed) this.track.removeLine(l.id);
+    for (const l of cmd.added) this.track.addLine(l, l.id);
+    this.undoStack.push(cmd);
+    this.events.onEdit?.();
+  }
+
+  clearHistory(): void {
+    this.undoStack.length = 0;
+    this.redoStack.length = 0;
+    this.current = null;
+  }
+
+  /** Remove every player-drawn line (used by "clear my track"). */
+  clearPlayerLines(): void {
+    const cmd: Command = { added: [], removed: [] };
+    for (const l of [...this.track.lines.values()]) {
+      if (l.layer !== 'player') continue;
+      if (this.constraints.player && l.player !== this.constraints.player) continue;
+      this.track.removeLine(l.id);
+      cmd.removed.push({ ...l });
+    }
+    if (cmd.removed.length) {
+      this.undoStack.push(cmd);
+      this.redoStack.length = 0;
+      this.events.onEdit?.();
+    }
+  }
+}
