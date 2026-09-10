@@ -40,6 +40,25 @@ The core is verified without the editor: `cd tools/CoreTests && dotnet run` repl
 scenarios and all 32 level runs recorded from the web build and checks positions match exactly,
 then runs behaviour checks (JSON round trips, share codes, daily seeds, editor budgets, objects).
 
+### Android
+
+The project is set up for phones and tablets: landscape auto-rotation, ARM64 with IL2CPP, minimum
+API 24 (Android 7.0), package id `com.catgenova.cyberrider`, full-screen rendering with a HUD that
+keeps clear of the notch, and finger-sized controls (the UI scales with pixel density). To build:
+
+1. In Unity Hub add the **Android Build Support** module, with OpenJDK and the Android SDK & NDK
+   tools, to the editor you use for this project.
+2. Open the project, go to **File > Build Settings**, select **Android** and press
+   **Switch Platform**.
+3. Enable USB debugging on the phone, plug it in and press **Build And Run**, or press **Build** for
+   an APK to sideload. **Player Settings** already carry the settings above; change the package
+   name there before publishing.
+
+On a touchscreen one finger draws with the current tool (or pans with the Pan tool), two fingers
+pan and pinch-zoom, a second finger cancels the stroke in progress, and every keyboard shortcut has
+a button in the HUD. The browser build behaves the same way in Android Chrome: open
+`web/cyber-rider.html` on the phone, or add the dev server's address to the home screen.
+
 ## Web (`web/`)
 
 **Quickest way to play:** open `web/cyber-rider.html` in any modern browser. It is a
@@ -73,6 +92,7 @@ tracks travel between players as share codes (`CYR1.…`).
 | Tab | Co-op: hand the pen to the other player |
 | G | Toggle ghost |
 | , . | Playback speed |
+| Touch | One finger uses the current tool; two fingers pan and pinch-zoom; buttons cover the rest |
 
 Lines are one-sided, exactly like the original: draw left to right and the top face is solid.
 

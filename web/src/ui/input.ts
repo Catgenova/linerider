@@ -2,32 +2,82 @@ import type { Game } from '../game/game';
 import { MATERIALS, MATERIAL_ORDER } from '../physics/materials';
 import type { Screens } from './screens';
 
-/** Pointer and keyboard wiring for the canvas. */
+/**
+ * Pointer, touch and keyboard wiring for the canvas. A mouse works as before; on a touchscreen one
+ * finger drives the current tool and two fingers pan and pinch-zoom.
+ */
 export function bindInput(canvas: HTMLCanvasElement, game: Game, screens: Screens): void {
   const pos = (ev: PointerEvent | WheelEvent) => {
     const r = canvas.getBoundingClientRect();
     return { x: ev.clientX - r.left, y: ev.clientY - r.top };
   };
+  const touches = new Map<number, { x: number; y: number }>();
+  /** The pointer currently driving the editor (mouse button or the first finger). */
+  let drawId: number | null = null;
+  let pinch: { cx: number; cy: number; d: number } | null = null;
+  /** After a two-finger gesture, ignore new strokes until every finger has lifted. */
+  let gestureLock = false;
+  const pinchState = () => {
+    const [a, b] = [...touches.values()];
+    return { cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, d: Math.hypot(b.x - a.x, b.y - a.y) };
+  };
+
   canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
   window.addEventListener('pointerdown', () => game.audio.unlock(), { capture: true });
   window.addEventListener('keydown', () => game.audio.unlock(), { capture: true });
+
   canvas.addEventListener('pointerdown', (ev) => {
     if (screens.open) return;
     canvas.setPointerCapture(ev.pointerId);
     const { x, y } = pos(ev);
+    if (ev.pointerType === 'touch') {
+      touches.set(ev.pointerId, { x, y });
+      if (touches.size >= 2) {
+        // A second finger turns the stroke into a pan/zoom gesture; the stroke is discarded.
+        if (drawId !== null) {
+          game.editor.discardDrag();
+          drawId = null;
+        }
+        pinch = pinchState();
+        gestureLock = true;
+        return;
+      }
+      if (gestureLock) return;
+    }
     if (ev.button === 0) {
       const w = game.camera.toWorld(x, y);
       if (game.handlePlacementClick(w.x, w.y)) return;
     }
+    drawId = ev.pointerId;
     game.editor.pointerDown(x, y, ev.button, ev.shiftKey);
     if (ev.button === 1) ev.preventDefault();
   });
   canvas.addEventListener('pointermove', (ev) => {
     if (screens.open) return;
     const { x, y } = pos(ev);
+    if (ev.pointerType === 'touch') {
+      if (!touches.has(ev.pointerId)) return;
+      touches.set(ev.pointerId, { x, y });
+      if (pinch && touches.size >= 2) {
+        const p = pinchState();
+        if (pinch.d > 1 && p.d > 1) game.camera.zoomAt(p.cx, p.cy, p.d / pinch.d);
+        game.camera.panBy(p.cx - pinch.cx, p.cy - pinch.cy);
+        game.following = false;
+        pinch = p;
+        return;
+      }
+      if (ev.pointerId !== drawId) return;
+    }
     game.editor.pointerMove(x, y, ev.shiftKey);
   });
-  const up = () => {
+  const up = (ev: PointerEvent) => {
+    if (ev.pointerType === 'touch') {
+      touches.delete(ev.pointerId);
+      if (touches.size < 2) pinch = null;
+      if (touches.size === 0) gestureLock = false;
+      if (ev.pointerId !== drawId) return;
+    }
+    drawId = null;
     game.editor.pointerUp();
   };
   canvas.addEventListener('pointerup', up);

@@ -8,6 +8,52 @@ namespace CyberRider.Unity
     public static class UiKit
     {
         public static Font Font;
+        /// <summary>Phone/tablet layout: finger-sized buttons and a denser HUD.</summary>
+        public static bool Compact;
+        /// <summary>Canvas scale (screen pixels per UI unit) chosen by <see cref="ComputeScale"/>.</summary>
+        public static float Scale = 1f;
+
+        public static float CanvasWidth => Screen.width / Scale;
+
+        public static float CanvasHeight => Screen.height / Scale;
+
+        /// <summary>Width of the notch-free part of the screen in UI units.</summary>
+        public static float SafeWidth => Screen.safeArea.width / Scale;
+
+        /// <summary>
+        /// Pick the canvas scale for the current screen. Desktops scale with the window like a
+        /// 1280 x 760 reference layout; handhelds scale with pixel density so buttons stay finger-sized,
+        /// while keeping at least 760 x 400 units of canvas for the layout.
+        /// </summary>
+        public static float ComputeScale()
+        {
+            float w = Mathf.Max(1, Screen.width);
+            float h = Mathf.Max(1, Screen.height);
+            float s;
+            if (Compact)
+            {
+                float dpi = Screen.dpi > 0 ? Screen.dpi : 400f;
+                s = Mathf.Clamp(dpi / 175f, 1.2f, 4f);
+                s = Mathf.Min(s, Mathf.Min(w / 760f, h / 400f));
+                s = Mathf.Max(s, 1f);
+            }
+            else s = Mathf.Sqrt((w / 1280f) * (h / 760f));
+            Scale = s;
+            return s;
+        }
+
+        /// <summary>Anchor a full-canvas rect to the screen's safe area (clear of notches and rounded corners).</summary>
+        public static void ApplySafeArea(RectTransform rt)
+        {
+            Rect sa = Screen.safeArea;
+            float w = Mathf.Max(1, Screen.width);
+            float h = Mathf.Max(1, Screen.height);
+            rt.anchorMin = new Vector2(sa.x / w, sa.y / h);
+            rt.anchorMax = new Vector2((sa.x + sa.width) / w, (sa.y + sa.height) / h);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+        }
         public static readonly Color Cyan = U.Hex("#39f6ff");
         public static readonly Color Magenta = U.Hex("#ff2bd6");
         public static readonly Color Lime = U.Hex("#c6ff4a");
@@ -131,6 +177,7 @@ namespace CyberRider.Unity
         public static Button Button(Transform parent, string label, Action onClick, Color? accent = null, int fontSize = 13, float height = 30, float minWidth = 0, bool primary = false)
         {
             Color acc = accent ?? (primary ? Magenta : Cyan);
+            if (Compact) height = Mathf.Max(height, 36);
             RectTransform rt = Rect("Button", parent);
             var img = rt.gameObject.AddComponent<Image>();
             img.color = primary ? new Color(acc.r, acc.g, acc.b, 0.22f) : ButtonBg;
@@ -186,7 +233,7 @@ namespace CyberRider.Unity
             return lg;
         }
 
-        public static GridLayoutGroup Grid(Transform parent, string name, float cellW, float cellH, float spacing, int padding = 0)
+        public static GridLayoutGroup Grid(Transform parent, string name, float cellW, float cellH, float spacing, int padding = 0, bool fit = true)
         {
             RectTransform rt = Rect(name, parent);
             var g = rt.gameObject.AddComponent<GridLayoutGroup>();
@@ -194,8 +241,11 @@ namespace CyberRider.Unity
             g.spacing = new Vector2(spacing, spacing);
             g.padding = new RectOffset(padding, padding, padding, padding);
             g.childAlignment = TextAnchor.UpperLeft;
-            var fitter = rt.gameObject.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            if (fit)
+            {
+                var fitter = rt.gameObject.AddComponent<ContentSizeFitter>();
+                fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            }
             return g;
         }
 

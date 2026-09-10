@@ -13,6 +13,7 @@ web/dist/
 /Build/
 /Builds/
 *.csproj
+!tools/*/*.csproj
 *.sln
 *.pidb
 *.booproj

@@ -216,6 +216,25 @@ namespace CyberRider.Core
             Commit();
         }
 
+        /// <summary>Abandon the drag in progress and revert what it changed (a second finger turned it into a gesture).</summary>
+        public void DiscardDrag()
+        {
+            Command c = _current;
+            _dragging = false;
+            Preview = null;
+            _anchor = null;
+            _lastPencil = null;
+            _current = null;
+            if (c == null || c.Empty) return;
+            foreach (LineData l in c.Added) Track.RemoveLine(l.Id);
+            foreach (LineData l in c.Removed) Track.AddLine(l);
+            foreach (ObjectData o in c.AddedObjects) Track.RemoveObject(o.Id);
+            foreach (ObjectData o in c.RemovedObjects) Track.AddObject(o.Def, o.Id);
+            foreach (PropData o in c.AddedProps) Track.RemoveProp(o.Id);
+            foreach (PropData o in c.RemovedProps) Track.AddProp(o.Def, o.Id);
+            OnEdit?.Invoke();
+        }
+
         /// <summary>Add a line respecting the ink budget. Returns the line actually added (possibly truncated).</summary>
         public LineData AddLine(double x1, double y1, double x2, double y2)
         {

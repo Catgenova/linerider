@@ -293,6 +293,25 @@ export class Editor {
     this.commit();
   }
 
+  /** Abandon the drag in progress and revert what it changed (a second finger turned it into a gesture). */
+  discardDrag(): void {
+    const c = this.current;
+    this.dragging = false;
+    this.panning = false;
+    this.preview = null;
+    this.anchor = null;
+    this.lastPencil = null;
+    this.current = null;
+    if (!c) return;
+    for (const l of c.added) this.track.removeLine(l.id);
+    for (const l of c.removed) this.track.addLine(l, l.id);
+    for (const o of c.addedObjects ?? []) this.track.removeObject(o.id);
+    for (const o of c.removedObjects ?? []) this.track.addObject(o.def, o.id);
+    for (const o of c.addedProps ?? []) this.track.removeProp(o.id);
+    for (const o of c.removedProps ?? []) this.track.addProp(o.def, o.id);
+    this.events.onEdit?.();
+  }
+
   wheel(sx: number, sy: number, deltaY: number): void {
     const factor = Math.exp(-deltaY * 0.0012);
     this.camera.zoomAt(sx, sy, factor);

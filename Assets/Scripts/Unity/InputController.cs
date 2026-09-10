@@ -1,11 +1,15 @@
+using System.Collections.Generic;
 using CyberRider.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace CyberRider.Unity
 {
-    /// <summary>Mouse and keyboard handling for the editor, camera and playback shortcuts. Reads go through
-    /// <see cref="InputBridge"/> so either Unity input backend works.</summary>
+    /// <summary>
+    /// Mouse, touch and keyboard handling for the editor, camera and playback shortcuts. Reads go
+    /// through <see cref="InputBridge"/> so either Unity input backend works. On a touchscreen one
+    /// finger drives the current tool and two fingers pan and pinch-zoom.
+    /// </summary>
     public sealed class InputController
     {
         private readonly GameController _game;
@@ -13,6 +17,14 @@ namespace CyberRider.Unity
         private bool _panning;
         private Vector3 _lastMouse;
         private bool _drawing;
+        private int _drawTouch = -1;
+        private Vector2 _lastTouch;
+        private bool _pinching;
+        private bool _gestureLock;
+        private Vector2 _pinchCenter;
+        private float _pinchDist;
+        private readonly List<TouchPoint> _active = new List<TouchPoint>();
+        private readonly List<RaycastResult> _hits = new List<RaycastResult>();
 
         public InputController(GameController game, Screens screens)
         {
@@ -20,17 +32,22 @@ namespace CyberRider.Unity
             _screens = screens;
         }
 
-        private Vec2d MouseWorld(out double sx, out double sy)
+        /// <summary>True when a UI element sits under a screen point (origin bottom-left).</summary>
+        private bool OverUiAt(Vector2 screenPos)
         {
-            Vector3 m = InputBridge.MousePosition;
-            sx = m.x;
-            sy = Screen.height - m.y;
-            return _game.Camera.ToWorld(sx, sy);
+            EventSystem es = EventSystem.current;
+            if (es == null) return false;
+            var data = new PointerEventData(es) { position = screenPos };
+            _hits.Clear();
+            es.RaycastAll(data, _hits);
+            return _hits.Count > 0;
         }
 
-        private static bool OverUi()
+        private Vec2d ToWorld(Vector2 screenPos, out double sx, out double sy)
         {
-            return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+            sx = screenPos.x;
+            sy = Screen.height - screenPos.y;
+            return _game.Camera.ToWorld(sx, sy);
         }
 
         public void Update()
@@ -40,6 +57,7 @@ namespace CyberRider.Unity
             bool shift = InputBridge.IsKey(KeyCode.LeftShift) || InputBridge.IsKey(KeyCode.RightShift);
             bool ctrl = InputBridge.IsKey(KeyCode.LeftControl) || InputBridge.IsKey(KeyCode.RightControl) || InputBridge.IsKey(KeyCode.LeftCommand) || InputBridge.IsKey(KeyCode.RightCommand);
 
+            // Escape (the Android back button reports as Escape too).
             if (InputBridge.KeyDown(KeyCode.Escape))
             {
                 if (_screens.IsOpen)
@@ -53,12 +71,22 @@ namespace CyberRider.Unity
             {
                 _drawing = false;
                 _panning = false;
+                _pinching = false;
+                _drawTouch = -1;
                 return;
             }
 
-            Vec2d w = MouseWorld(out double sx, out double sy);
+            if (InputBridge.TouchCount > 0) UpdateTouch(game, editor, shift);
+            else UpdateMouse(game, editor, shift);
+            UpdateKeys(game, editor, shift, ctrl);
+        }
+
+        private void UpdateMouse(GameController game, Core.Editor editor, bool shift)
+        {
             Vector3 mouse = InputBridge.MousePosition;
-            bool overUi = OverUi();
+            var mouse2 = new Vector2(mouse.x, mouse.y);
+            Vec2d w = ToWorld(mouse2, out double sx, out double sy);
+            bool overUi = OverUiAt(mouse2);
 
             // Wheel zoom.
             float scroll = Mathf.Clamp(InputBridge.ScrollDelta, -3f, 3f);
@@ -103,7 +131,89 @@ namespace CyberRider.Unity
                 editor.PointerUp();
                 _drawing = false;
             }
+        }
 
+        private void UpdateTouch(GameController game, Core.Editor editor, bool shift)
+        {
+            int n = InputBridge.TouchCount;
+            _active.Clear();
+            for (int i = 0; i < n; i++)
+            {
+                TouchPoint t = InputBridge.GetTouch(i);
+                if (!t.Ended) _active.Add(t);
+            }
+
+            if (_active.Count >= 2)
+            {
+                // A second finger turns the stroke into a pan/zoom gesture; the stroke is discarded.
+                if (_drawing)
+                {
+                    editor.DiscardDrag();
+                    _drawing = false;
+                }
+                _panning = false;
+                _drawTouch = -1;
+                Vector2 a = _active[0].Position;
+                Vector2 b = _active[1].Position;
+                Vector2 c = (a + b) * 0.5f;
+                float d = Vector2.Distance(a, b);
+                if (_pinching)
+                {
+                    if (_pinchDist > 1f && d > 1f) game.Camera.ZoomAt(c.x, Screen.height - c.y, d / _pinchDist);
+                    game.Camera.PanBy(c.x - _pinchCenter.x, -(c.y - _pinchCenter.y));
+                    game.Following = false;
+                    editor.Zoom = game.Camera.Zoom;
+                }
+                _pinching = true;
+                _gestureLock = true;
+                _pinchCenter = c;
+                _pinchDist = d;
+                return;
+            }
+
+            _pinching = false;
+            if (_active.Count == 0) _gestureLock = false;
+            for (int i = 0; i < n; i++)
+            {
+                TouchPoint t = InputBridge.GetTouch(i);
+                Vec2d w = ToWorld(t.Position, out _, out _);
+                if (t.Began && !t.Ended && _drawTouch < 0 && !_gestureLock)
+                {
+                    if (OverUiAt(t.Position)) continue;
+                    _drawTouch = t.Id;
+                    _lastTouch = t.Position;
+                    if (editor.Tool == ToolId.Pan)
+                    {
+                        _panning = true;
+                        game.Following = false;
+                    }
+                    else if (!game.HandlePlacementClick(w.X, w.Y))
+                    {
+                        editor.PointerDown(w.X, w.Y, shift);
+                        _drawing = true;
+                    }
+                }
+                else if (t.Id == _drawTouch)
+                {
+                    if (_panning)
+                    {
+                        game.Camera.PanBy(t.Position.x - _lastTouch.x, -(t.Position.y - _lastTouch.y));
+                        _lastTouch = t.Position;
+                    }
+                    else editor.PointerMove(w.X, w.Y, shift);
+                    if (t.Ended)
+                    {
+                        if (_drawing) editor.PointerUp();
+                        _drawing = false;
+                        _panning = false;
+                        _drawTouch = -1;
+                    }
+                }
+            }
+        }
+
+        private void UpdateKeys(GameController game, Core.Editor editor, bool shift, bool ctrl)
+        {
             // Keyboard panning.
             double panSpeed = 400 * Time.deltaTime / game.Camera.Zoom;
             if (InputBridge.IsKey(KeyCode.LeftArrow)) { game.Camera.PanBy(panSpeed * game.Camera.Zoom, 0); game.Following = false; }

@@ -5,6 +5,9 @@ import { MATERIALS, type MaterialId } from '../physics/materials';
 import { OBJECT_KINDS } from '../game/objectKinds';
 import { $, clear, el, fmtTime } from './dom';
 
+/** Coarse pointers (phones, tablets) get touch wording instead of keyboard hints. */
+const TOUCH = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+
 const TOOLS: { id: ToolId; label: string; key: string; icon: string }[] = [
   { id: 'pencil', label: 'Pencil', key: 'P', icon: '✎' },
   { id: 'line', label: 'Line', key: 'L', icon: '╱' },
@@ -147,7 +150,9 @@ export class Hud {
     this.hint.textContent =
       game.mode === 'arcade'
         ? 'Draw ahead of Bosh. Ink grows with distance. Space pauses.'
-        : 'Space play · R restart · F flag · scroll zoom · middle-drag pan · right-click flips a line';
+        : TOUCH
+          ? 'One finger draws · two fingers pan and zoom · the Flip tool taps a line'
+          : 'Space play · R restart · F flag · scroll zoom · middle-drag pan · right-click flips a line';
     this.update();
   }
 

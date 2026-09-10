@@ -53,7 +53,9 @@ namespace CyberRider.Unity
             prt.anchorMin = new Vector2(0.5f, 0);
             prt.anchorMax = new Vector2(0.5f, 1);
             prt.pivot = new Vector2(0.5f, 0.5f);
-            prt.sizeDelta = new Vector2(width, -48);
+            // Never wider than the notch-free screen; phones keep a slimmer margin.
+            width = Mathf.Min(width, UiKit.SafeWidth - 24);
+            prt.sizeDelta = new Vector2(width, UiKit.Compact ? -16 : -48);
             prt.anchoredPosition = Vector2.zero;
             UiKit.Border(prt, UiKit.PanelBorder);
             RectTransform content = UiKit.ScrollList(prt, "Scroll");
@@ -106,20 +108,31 @@ namespace CyberRider.Unity
             g.Progress.TotalMedals(out _, out _, out int gold);
             int done = 0;
             foreach (LevelDef l in Levels.All) if (g.Progress.IsComplete(l.Id)) done++;
-            var logo = UiKit.Label(c, "CYBER", 72, Color.white, TextAnchor.MiddleCenter, true);
-            UiKit.Size(logo, -1, 80);
-            var logo2 = UiKit.Label(c, "RIDER", 34, UiKit.Magenta, TextAnchor.MiddleCenter, true);
-            UiKit.Size(logo2, -1, 44);
+            bool compact = UiKit.Compact;
+            var logo = UiKit.Label(c, "CYBER", compact ? 52 : 72, Color.white, TextAnchor.MiddleCenter, true);
+            UiKit.Size(logo, -1, compact ? 58 : 80);
+            var logo2 = UiKit.Label(c, "RIDER", compact ? 26 : 34, UiKit.Magenta, TextAnchor.MiddleCenter, true);
+            UiKit.Size(logo2, -1, compact ? 34 : 44);
             UiKit.Label(c, "Draw the line. Ride the pulse.", 13, UiKit.Muted, TextAnchor.MiddleCenter);
-            UiKit.Spacer(c, 10);
-            BigButton(c, "ADVENTURE", done + "/" + Levels.All.Count + " levels · " + gold + " gold", () => Map(_selectedRegion));
-            BigButton(c, "FREE RIDE", "Unlimited ink, every material, place objects, publish your tracks", FreeRideEnv);
-            BigButton(c, "CYBER RUSH", "Draw while riding · best " + g.Progress.ArcadeBest + " m", () => { g.StartArcade(); Hide(); _onEnterGame(); });
-            BigButton(c, "DAILY CHALLENGE", Daily.TodayKey(), DailyScreen);
-            BigButton(c, "TRACK LIBRARY", "Community tracks, share codes, records", () => Library("all"));
-            BigButton(c, "CO-OP", "Two players, two colours of ink", Coop);
-            BigButton(c, "RIDERS", "Riding as " + g.RiderDef.Name, RidersScreen);
-            UiKit.Spacer(c, 10);
+            UiKit.Spacer(c, compact ? 4 : 10);
+            Transform menu = c;
+            if (compact)
+            {
+                // Two columns of mode buttons so the menu fits a phone in landscape.
+                float pw = Mathf.Min(720, UiKit.SafeWidth - 24);
+                var mg = UiKit.Grid(c, "Menu", (pw - 52) / 2, 52, 8, 0, false);
+                mg.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                mg.constraintCount = 2;
+                menu = mg.transform;
+            }
+            BigButton(menu, "ADVENTURE", done + "/" + Levels.All.Count + " levels · " + gold + " gold", () => Map(_selectedRegion));
+            BigButton(menu, "FREE RIDE", "Unlimited ink, every material, place objects, publish your tracks", FreeRideEnv);
+            BigButton(menu, "CYBER RUSH", "Draw while riding · best " + g.Progress.ArcadeBest + " m", () => { g.StartArcade(); Hide(); _onEnterGame(); });
+            BigButton(menu, "DAILY CHALLENGE", Daily.TodayKey(), DailyScreen);
+            BigButton(menu, "TRACK LIBRARY", "Community tracks, share codes, records", () => Library("all"));
+            BigButton(menu, "CO-OP", "Two players, two colours of ink", Coop);
+            BigButton(menu, "RIDERS", "Riding as " + g.RiderDef.Name, RidersScreen);
+            UiKit.Spacer(c, compact ? 4 : 10);
             var row = Row(c, TextAnchor.MiddleCenter);
             UiKit.Button(row.transform, _confirmReset ? "click again to erase all progress" : "reset progress", () =>
             {

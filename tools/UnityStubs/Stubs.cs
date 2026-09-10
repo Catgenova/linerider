@@ -13,6 +13,8 @@ namespace UnityEngine
         public static Vector2 one => new Vector2(1, 1);
         public static Vector2 operator +(Vector2 a, Vector2 b) => new Vector2(a.x + b.x, a.y + b.y);
         public static Vector2 operator -(Vector2 a, Vector2 b) => new Vector2(a.x - b.x, a.y - b.y);
+        public static Vector2 operator *(Vector2 a, float s) => new Vector2(a.x * s, a.y * s);
+        public static float Distance(Vector2 a, Vector2 b) => (float)System.Math.Sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
     }
 
     public struct Vector3
@@ -271,6 +273,25 @@ namespace UnityEngine
     {
         public static int width { get; }
         public static int height { get; }
+        public static float dpi { get; }
+        public static Rect safeArea { get; }
+        public static int sleepTimeout { get; set; }
+    }
+
+    public static class SleepTimeout
+    {
+        public const int NeverSleep = -1;
+        public const int SystemSetting = -2;
+    }
+
+    public enum TouchPhase { Began, Moved, Stationary, Ended, Canceled }
+
+    public struct Touch
+    {
+        public int fingerId;
+        public Vector2 position;
+        public Vector2 deltaPosition;
+        public TouchPhase phase;
     }
 
     public static class Time
@@ -278,6 +299,7 @@ namespace UnityEngine
         public static float deltaTime { get; }
         public static float unscaledDeltaTime { get; }
         public static float time { get; }
+        public static int frameCount { get; }
     }
 
     public enum KeyCode
@@ -297,12 +319,16 @@ namespace UnityEngine
         public static bool GetMouseButtonUp(int b) => false;
         public static bool GetKey(KeyCode k) => false;
         public static bool GetKeyDown(KeyCode k) => false;
+        public static int touchCount { get; }
+        public static bool touchSupported { get; }
+        public static Touch GetTouch(int i) => default;
     }
 
     public static class Application
     {
         public static string persistentDataPath { get; }
         public static int targetFrameRate { get; set; }
+        public static bool isMobilePlatform { get; }
         public static void Quit() { }
     }
 
@@ -382,6 +408,24 @@ namespace UnityEngine
         {
             public static EventSystem current { get; }
             public bool IsPointerOverGameObject() => false;
+            public bool IsPointerOverGameObject(int pointerId) => false;
+            public void RaycastAll(PointerEventData data, System.Collections.Generic.List<RaycastResult> results) { }
+        }
+
+        public class BaseEventData
+        {
+            public BaseEventData(EventSystem es) { }
+        }
+
+        public class PointerEventData : BaseEventData
+        {
+            public PointerEventData(EventSystem es) : base(es) { }
+            public Vector2 position { get; set; }
+        }
+
+        public struct RaycastResult
+        {
+            public GameObject gameObject;
         }
 
         public class StandaloneInputModule : MonoBehaviour
@@ -485,6 +529,9 @@ namespace UnityEngine
 
         public class GridLayoutGroup : LayoutGroup
         {
+            public enum Constraint { Flexible, FixedColumnCount, FixedRowCount }
+            public Constraint constraint { get; set; }
+            public int constraintCount { get; set; }
             public Vector2 cellSize { get; set; }
             public Vector2 spacing { get; set; }
         }
@@ -516,6 +563,7 @@ namespace UnityEngine
             public ScaleMode uiScaleMode { get; set; }
             public Vector2 referenceResolution { get; set; }
             public float matchWidthOrHeight { get; set; }
+            public float scaleFactor { get; set; }
         }
 
         public class GraphicRaycaster : MonoBehaviour { }
@@ -539,6 +587,12 @@ namespace UnityEngine.InputSystem
     {
         public static Keyboard current { get; }
         public Controls.KeyControl this[Key key] => null;
+    }
+
+    public class Touchscreen
+    {
+        public static Touchscreen current { get; }
+        public Utilities.ReadOnlyArray<Controls.TouchControl> touches { get; }
     }
 
     public class Mouse
@@ -571,6 +625,27 @@ namespace UnityEngine.InputSystem
 
         public class DeltaControl : Vector2Control
         {
+        }
+
+        public class IntegerControl
+        {
+            public int ReadValue() => 0;
+        }
+
+        public class TouchControl
+        {
+            public ButtonControl press { get; }
+            public IntegerControl touchId { get; }
+            public Vector2Control position { get; }
+        }
+    }
+
+    namespace Utilities
+    {
+        public struct ReadOnlyArray<T>
+        {
+            public int Count => 0;
+            public T this[int index] => default;
         }
     }
 
