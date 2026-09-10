@@ -43,6 +43,11 @@ export class Prop {
   readonly height: number;
   gravityScale: number;
   dormant: boolean;
+  /** At rest: frozen until touched, pushed or blown up. */
+  sleeping = false;
+  private stillFrames = 0;
+  private anchorX = 0;
+  private anchorY = 0;
   active = true;
   /** Rolling angle for circles, radians. */
   spin = 0;
@@ -137,6 +142,13 @@ export class Prop {
 
   wake(): void {
     this.dormant = false;
+    this.sleeping = false;
+    this.stillFrames = 0;
+  }
+
+  /** Not participating in motion this frame. */
+  get frozen(): boolean {
+    return this.dormant || this.sleeping;
   }
 
   /** Treat the current (settled) position as the origin and clear any disturbance. */
@@ -157,7 +169,7 @@ export class Prop {
 
   step(gx: number, gy: number): void {
     if (!this.active) return;
-    if (this.dormant) {
+    if (this.dormant || this.sleeping) {
       for (const p of this.points) {
         p.vx = 0;
         p.vy = 0;
@@ -186,8 +198,33 @@ export class Prop {
     }
   }
 
+  /**
+   * Call after the collision passes: fall asleep once the centre has stayed within a pixel for
+   * thirty frames. Judging the centre over a window ignores contact jitter but catches creep.
+   */
+  updateSleep(): void {
+    if (!this.active || this.frozen) return;
+    const c = this.center();
+    if (Math.abs(c.x - this.anchorX) + Math.abs(c.y - this.anchorY) > 2) {
+      this.anchorX = c.x;
+      this.anchorY = c.y;
+      this.stillFrames = 0;
+      return;
+    }
+    this.stillFrames++;
+    if (this.stillFrames > 40) {
+      this.sleeping = true;
+      for (const p of this.points) {
+        p.px = p.x;
+        p.py = p.y;
+        p.vx = 0;
+        p.vy = 0;
+      }
+    }
+  }
+
   satisfy(): void {
-    if (!this.active || this.dormant) return;
+    if (!this.active || this.frozen) return;
     const pts = this.points;
     for (const bone of this.bones) {
       const pa = pts[bone.a];

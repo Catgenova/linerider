@@ -235,6 +235,7 @@ export class Fan implements Entity {
       if (!prop.active || prop.dormant) continue;
       for (const p of prop.points) {
         if (p.x < d.x || p.x > d.x + d.w || p.y < d.y || p.y > d.y + d.h) continue;
+        if (prop.sleeping) prop.wake();
         p.px -= d.fx / prop.mass;
         p.py -= d.fy / prop.mass;
       }
@@ -905,6 +906,7 @@ export class Snowball implements Entity {
       return;
     }
     const p = this.prop.points[0];
+    if (this.prop.sleeping) this.prop.wake();
     // Only push while it has ground under it (touched something last frame).
     if (p.contact) p.px -= this.def.push;
   }

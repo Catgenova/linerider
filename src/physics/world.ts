@@ -131,7 +131,7 @@ export class World {
       for (let it = 0; it < ITERATIONS; it++) {
         for (const prop of this.props) prop.satisfy();
         for (const prop of this.props) {
-          if (!prop.active || prop.dormant) continue;
+          if (!prop.active || prop.frozen) continue;
           if (prop.isCircle) this.collideCircle(prop);
           else for (const p of prop.points) this.collidePoint(p);
         }
@@ -139,6 +139,7 @@ export class World {
           for (let j = i + 1; j < this.props.length; j++) this.collideProps(this.props[i], this.props[j]);
         }
       }
+      for (const prop of this.props) prop.updateSleep();
     }
     for (const prop of this.props) prop.rehome();
     this.events = [];
@@ -175,7 +176,7 @@ export class World {
       }
       this.ctx.riderFriction = 1;
       for (const prop of this.props) {
-        if (!prop.active || prop.dormant) continue;
+        if (!prop.active || prop.frozen) continue;
         if (prop.isCircle) this.collideCircle(prop);
         else for (const p of prop.points) this.collidePoint(p);
       }
@@ -218,6 +219,7 @@ export class World {
 
     for (const prop of this.props) {
       if (!prop.active) continue;
+      prop.updateSleep();
       if (prop.fuse > 0) prop.fuse--;
       if (prop.fuse === 0) this.detonate(prop);
     }
@@ -317,10 +319,10 @@ export class World {
         const ny = dy / d;
         p.x += nx * pen * share;
         p.y += ny * pen * share;
-        if (!prop.dormant) {
+        if (!prop.frozen) {
           c.x -= nx * pen * (1 - share);
           c.y -= ny * pen * (1 - share);
-        } else if (wakeProp) prop.wake();
+        } else if (wakeProp && (Math.abs(p.x - p.px) + Math.abs(p.y - p.py) > 0.4 || pen > 2)) prop.wake();
         this.noteImpact(p, prop);
       }
       return;
@@ -403,8 +405,9 @@ export class World {
   ): void {
     p.x += nx * delta * share;
     p.y += ny * delta * share;
-    if (prop.dormant) {
-      if (wakeProp) prop.wake();
+    if (prop.frozen) {
+      // Only a real hit wakes a resting prop; a box settling on top of it should not.
+      if (wakeProp && (Math.abs(p.x - p.px) + Math.abs(p.y - p.py) > 0.4 || -delta > 2)) prop.wake();
     } else {
       const tt = t < 0 ? 0 : t > 1 ? 1 : t;
       const wa = 1 - tt;
@@ -443,7 +446,7 @@ export class World {
   }
 
   private collideProps(a: Prop, b: Prop): void {
-    if (a.dormant && b.dormant) return;
+    if (a.frozen && b.frozen) return;
     if (a.isCircle && b.isCircle) {
       const pa = a.points[0];
       const pb = b.points[0];
@@ -456,14 +459,14 @@ export class World {
       const pen = rr - d;
       const nx = dx / d;
       const ny = dy / d;
-      const shareA = a.dormant ? 0 : b.mass / (a.mass + b.mass);
-      const shareB = b.dormant ? 0 : a.mass / (a.mass + b.mass);
+      const shareA = a.frozen ? 0 : b.mass / (a.mass + b.mass);
+      const shareB = b.frozen ? 0 : a.mass / (a.mass + b.mass);
       pa.x -= nx * pen * shareA;
       pa.y -= ny * pen * shareA;
       pb.x += nx * pen * shareB;
       pb.y += ny * pen * shareB;
-      if (a.dormant) a.wake();
-      if (b.dormant) b.wake();
+      if (a.frozen) a.wake();
+      if (b.frozen) b.wake();
       return;
     }
     if (a.isCircle) {
@@ -498,7 +501,7 @@ export class World {
       const c = prop.center();
       const d = Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2);
       if (d < radius) {
-        if (prop.dormant) prop.wake();
+        if (prop.frozen) prop.wake();
         if (prop.explosive && prop.fuse < 0) prop.fuse = 4 + Math.floor(d / 20);
         prop.disturbed = true;
       }
